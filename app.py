@@ -366,7 +366,7 @@ SEED_KEYWORDS = ["스티로폼 박스", "종이 아이스팩", "야자매트 35m
 def analyze_item_metrics(keyword):
     shop_url = "https://openapi.naver.com/v1/search/shop.json"
     shop_params = {"query": keyword, "display": 10} # [NEW V4.9.1] 10개 상품 조회해서 평균가격 파악
-    shop_data = safe_api_request("GET", shop_url, params=shop_params)
+    shop_data = safe_api_request("GET", shop_url, params=shop_params, batch_mode=True)
     
     if shop_data is None: return None
         
@@ -395,7 +395,7 @@ def analyze_item_metrics(keyword):
         ]
     }
     
-    dl_data = safe_api_request("POST", dl_url, headers=dl_headers, json_data=dl_body)
+    dl_data = safe_api_request("POST", dl_url, headers=dl_headers, json_data=dl_body, batch_mode=True)
     if dl_data is None: return None
         
     search_score = 0.0
@@ -971,8 +971,8 @@ with tab_daily:
                             "발견일자": datetime.now().strftime("%Y-%m-%d"),
                             "대상 카테고리": c_name.split("(")[0].strip(),
                             "신규 유망 키워드": kw,
-                            "상품 이미지": f"<img src='{img}' width='80' />" if img else "이미지 없음",
-                            "다이렉트 소싱": f"<a href='{lnk}' target='_blank'>[ 🔗 상품 분석 창 열기 ]</a>" if lnk else "링크 없음"
+                            "상품 이미지": f'=IMAGE("{img}")' if img else "이미지 없음",
+                            "다이렉트 소싱": f'=HYPERLINK("{lnk}", "[ 🔗 상품 분석 창 열기 ]")' if lnk else "링크 없음"
                         })
             
             prog_bar.progress((idx + 1) / len(cats))
