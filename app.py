@@ -87,33 +87,101 @@ if not API_KEYS:
 if 'key_idx' not in st.session_state:
     st.session_state.key_idx = 0
 
-# [NEW V4.9.5 B플랜] 로컬 영구 API 계량기 (Tracker DB) 모듈
-# 네이버 서버가 일일 쿼터를 반환하지 않는 구조적 한계를 극복하기 위해, 우리가 직접 쏜 횟수를 파일에 누적 기록합니다.
-USAGE_TRACKER_FILE = "api_usage_tracker.json"
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
+import json
+
+# ==========================================
+# [NEW V5.0] Google Sheets 영구 DB 연동 모듈 (Local + Streamlit Cloud 완벽 호환)
+# ==========================================
+SPREADSHEET_URL = "https://docs.google.com/spreadsheets/d/1swMVdcbV3keWCEF-7XctrKxxR7YkhlgNFBy8BLlOnDA/edit"
+
+@st.cache_resource
+def get_gsheets_client():
+    scopes = [
+        "https://www.googleapis.com/auth/spreadsheets",
+        "https://www.googleapis.com/auth/drive"
+    ]
+    try:
+        # 1. 로컬 환경 (바탕화면) 에서 google_key.json 찾기
+        if os.path.exists("google_key.json"):
+            creds = ServiceAccountCredentials.from_json_keyfile_name("google_key.json", scopes)
+        # 2. Streamlit Cloud 환경 (Secrets에서 불러오기)
+        elif "google_sheets" in st.secrets:
+            # st.secrets.google_sheets 가 dict 형태로 들어있다고 가정
+            creds_dict = dict(st.secrets["google_sheets"])
+            creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scopes)
+        else:
+            st.error("⚠️ Google Sheets 인증 키(google_key.json 또는 st.secrets)를 찾을 수 없습니다.")
+            return None
+        return gspread.authorize(creds)
+    except Exception as e:
+        st.error(f"⚠️ Google Sheets 인증 오류: {e}")
+        return None
+
+def get_or_create_worksheet(client, sheet_name):
+    try:
+        sheet = client.open_by_url(SPREADSHEET_URL)
+        try:
+            worksheet = sheet.worksheet(sheet_name)
+        except gspread.WorksheetNotFound:
+            worksheet = sheet.add_worksheet(title=sheet_name, rows="1000", cols="20")
+        return worksheet
+    except Exception as e:
+        st.error(f"⚠️ 워크시트 접근 오류: {e}")
+        return None
+
+def _init_usage(today):
+    return {"date": today, "keys": {str(i): {"datalab": 0, "shop": 0, "other": 0} for i in range(1, 6)}}
 
 def load_local_api_usage():
-    import json
     today = datetime.now().strftime("%Y-%m-%d")
-    if os.path.exists(USAGE_TRACKER_FILE):
-        try:
-            with open(USAGE_TRACKER_FILE, "r", encoding="utf-8") as f:
-                data = json.load(f)
-                if data.get("date") == today:
-                    return data
-        except:
-            pass
+    client = get_gsheets_client()
+    if not client: return _init_usage(today)
     
-    # 파일이 없거나 날짜가 지나면 오늘 0발 상태로 초기화
-    init_data = {"date": today, "keys": {str(i): {"datalab": 0, "shop": 0, "other": 0} for i in range(1, 6)}}
-    return init_data
+    ws = get_or_create_worksheet(client, "API_Quota")
+    if not ws: return _init_usage(today)
+
+    try:
+        records = ws.get_all_records()
+        for row in records:
+            if str(row.get("Date")) == today:
+                try:
+                    data = json.loads(row.get("Usage_JSON", "{}"))
+                    if "keys" in data: return data
+                except: pass
+    except Exception:
+        pass
+        
+    return _init_usage(today)
 
 def save_local_api_usage(data):
-    import json
+    today = data.get("date", datetime.now().strftime("%Y-%m-%d"))
+    client = get_gsheets_client()
+    if not client: return
+    
+    ws = get_or_create_worksheet(client, "API_Quota")
+    if not ws: return
+
     try:
-        with open(USAGE_TRACKER_FILE, "w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
+        headers = ws.row_values(1)
+        if not headers:
+            ws.append_row(["Date", "Usage_JSON"])
+            
+        records = ws.get_all_records()
+        row_idx = None
+        for idx, row in enumerate(records):
+            if str(row.get("Date")) == today:
+                row_idx = idx + 2
+                break
+                
+        json_str = json.dumps(data, ensure_ascii=False)
+        if row_idx:
+            ws.update_acell(f'B{row_idx}', json_str)
+        else:
+            ws.append_row([today, json_str])
     except Exception as e:
-        print(f"로컬 사용량 저장 실패: {e}")
+        print(f"DB 저장 오류: {e}")
 
 def increment_api_usage(key_num, url):
     data = load_local_api_usage()
@@ -902,14 +970,25 @@ with tab_daily:
             
         # 5. 영구 누적 기록
         if new_trends:
+            # 기존에 Sheets에 저장된 키워드 로드
+            logged_keywords_data = get_or_create_worksheet(get_gsheets_client(), "Cumulative_Trends").get_all_records()
+            df_exist = pd.DataFrame(logged_keywords_data) if logged_keywords_data else pd.DataFrame()
+
             df_new = pd.DataFrame(new_trends)
-            if os.path.exists(CUMULATIVE_FILE):
-                df_exist = pd.read_csv(CUMULATIVE_FILE)
-                df_merged = pd.concat([df_exist, df_new], ignore_index=True)
-            else:
-                df_merged = df_new
-            # 최종 세이브
-            df_merged.to_csv(CUMULATIVE_FILE, encoding='utf-8-sig', index=False)
+            
+            # 기존 데이터와 새 데이터를 병합
+            df_merged = pd.concat([df_exist, df_new], ignore_index=True)
+            
+            # 중복 제거 (예: '신규 유망 키워드'와 '발견일자' 기준으로)
+            df_merged.drop_duplicates(subset=['신규 유망 키워드', '발견일자'], keep='first', inplace=True)
+            
+            # Google Sheets에 저장
+            ws_cumulative = get_or_create_worksheet(get_gsheets_client(), "Cumulative_Trends")
+            if ws_cumulative:
+                # 기존 내용 삭제 후 새로 쓰기 (간단한 방법)
+                ws_cumulative.clear()
+                ws_cumulative.update([df_merged.columns.values.tolist()] + df_merged.values.tolist())
+            
             status_text.success(f"✅ 일괄 순회 완료! 과거 데이터 대비 무려 **{len(new_trends)}개**의 신규 아이템을 발굴하여 금고에 누적했습니다.")
         else:
             status_text.info("✅ 일괄 순회 완료! 어제 대비 새롭게 치고 올라온 신규 아이템이 없습니다. (혹은 과거 비교용 데이터가 없습니다.)")
