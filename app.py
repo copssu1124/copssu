@@ -183,8 +183,11 @@ def save_local_api_usage(data):
     except Exception as e:
         print(f"DB 저장 오류: {e}")
 
-def increment_api_usage(key_num, url):
-    data = load_local_api_usage()
+def increment_api_usage(key_num, url, batch_mode=False):
+    if 'api_usage_cache' not in st.session_state:
+        st.session_state.api_usage_cache = load_local_api_usage()
+        
+    data = st.session_state.api_usage_cache
     api_type = "other"
     if "datalab/search" in url:
         api_type = "datalab"
@@ -194,7 +197,13 @@ def increment_api_usage(key_num, url):
     k_str = str(key_num)
     if k_str in data["keys"]:
         data["keys"][k_str][api_type] += 1
+        
+    if not batch_mode:
         save_local_api_usage(data)
+
+def flush_api_usage():
+    if 'api_usage_cache' in st.session_state:
+        save_local_api_usage(st.session_state.api_usage_cache)
 
 def get_rotating_client():
     idx = st.session_state.key_idx
@@ -204,7 +213,7 @@ def get_rotating_client():
 def rotate_key():
     st.session_state.key_idx = (st.session_state.key_idx + 1) % len(API_KEYS)
 
-def safe_api_request(method, url, headers=None, params=None, json_data=None):
+def safe_api_request(method, url, headers=None, params=None, json_data=None, batch_mode=False):
     max_retries = len(API_KEYS)
     retries = 0
     
@@ -223,8 +232,8 @@ def safe_api_request(method, url, headers=None, params=None, json_data=None):
                 
             if res.status_code == 200:
                 print(f"✅ [{key_num}번 키] API 호출 성공")
-                # [V4.9.5] 외부(네이버) 통신 성공 즉시 로컬 계량기 +1 영구 누적
-                increment_api_usage(key_num, url)
+                # [V4.9.5] 외부(네이버) 통신 성공 즉시 계량기 로컬 캐시에 누적
+                increment_api_usage(key_num, url, batch_mode)
                 return res.json()
             elif res.status_code == 429:
                 print("현재 키의 한도가 소진되었습니다")
@@ -901,7 +910,7 @@ with tab_daily:
         # 신규 키워드 발견 시 네이버 쇼핑 API를 통해 1위 상품 썸네일과 링크 파싱
         shop_url = "https://openapi.naver.com/v1/search/shop.json"
         shop_params = {"query": keyword, "display": 1, "sort": "sim"}
-        shop_data = safe_api_request("GET", shop_url, params=shop_params)
+        shop_data = safe_api_request("GET", shop_url, params=shop_params, batch_mode=True)
         
         if shop_data and 'items' in shop_data and len(shop_data['items']) > 0:
             item = shop_data['items'][0]
@@ -971,8 +980,12 @@ with tab_daily:
         # 5. 영구 누적 기록
         if new_trends:
             # 기존에 Sheets에 저장된 키워드 로드
-            logged_keywords_data = get_or_create_worksheet(get_gsheets_client(), "Cumulative_Trends").get_all_records()
-            df_exist = pd.DataFrame(logged_keywords_data) if logged_keywords_data else pd.DataFrame()
+            try:
+                logged_keywords_data = get_or_create_worksheet(get_gsheets_client(), "Cumulative_Trends").get_all_records()
+                df_exist = pd.DataFrame(logged_keywords_data) if logged_keywords_data else pd.DataFrame()
+            except Exception as e:
+                df_exist = pd.DataFrame()
+                print(f"기존 누적 데이터 조회 오류 (무시하고 계속 진행): {e}")
 
             df_new = pd.DataFrame(new_trends)
             
@@ -983,16 +996,21 @@ with tab_daily:
             df_merged.drop_duplicates(subset=['신규 유망 키워드', '발견일자'], keep='first', inplace=True)
             
             # Google Sheets에 저장
-            ws_cumulative = get_or_create_worksheet(get_gsheets_client(), "Cumulative_Trends")
-            if ws_cumulative:
-                # 기존 내용 삭제 후 새로 쓰기 (간단한 방법)
-                ws_cumulative.clear()
-                ws_cumulative.update([df_merged.columns.values.tolist()] + df_merged.values.tolist())
+            try:
+                ws_cumulative = get_or_create_worksheet(get_gsheets_client(), "Cumulative_Trends")
+                if ws_cumulative:
+                    # 기존 내용 삭제 후 새로 쓰기 (간단한 방법)
+                    ws_cumulative.clear()
+                    ws_cumulative.update([df_merged.columns.values.tolist()] + df_merged.values.tolist())
+            except Exception as e:
+                status_text.error(f"⚠️ 영구 누적 저장 과정에서 Google Sheets API 에러가 발생했습니다: {e}")
             
             status_text.success(f"✅ 일괄 순회 완료! 과거 데이터 대비 무려 **{len(new_trends)}개**의 신규 아이템을 발굴하여 금고에 누적했습니다.")
         else:
             status_text.info("✅ 일괄 순회 완료! 어제 대비 새롭게 치고 올라온 신규 아이템이 없습니다. (혹은 과거 비교용 데이터가 없습니다.)")
             
+        # [V4.9.5 BATCH] 쌓아둔 API 사용량 캐시를 한 번에 구글 시트에 업데이트
+        flush_api_usage()
         prog_bar.empty()
         
     st.write("---")
