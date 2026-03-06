@@ -1,0 +1,14 @@
+# API keys and secrets
+.env
+
+# Streamlit config (optional)
+.streamlit/
+
+# Local database / tracked files
+data/
+api_usage_tracker.json
+
+# Cache and python files
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
