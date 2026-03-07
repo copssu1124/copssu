@@ -2,6 +2,11 @@ import streamlit as st
 import streamlit.components.v1 as components
 import requests
 import os
+import sys
+
+# [V4.9.6 Hotfix] Streamlit 실행 디렉터리 이슈로 인한 파일 로드(로컬 CSV, 구글 키) 실패 방지: 작업 폴더 강제 고정
+os.chdir(os.path.dirname(os.path.abspath(__file__)))
+
 import pandas as pd
 import time
 import random
@@ -1002,6 +1007,12 @@ with tab_daily:
                     # 기존 내용 삭제 후 새로 쓰기 (간단한 방법)
                     ws_cumulative.clear()
                     ws_cumulative.update([df_merged.columns.values.tolist()] + df_merged.values.tolist())
+                    
+                    # [V4.9.6] 엑셀 백업 유지 및 대시보드 구글시트 캐시 리셋
+                    df_merged.to_csv(CUMULATIVE_FILE, index=False, encoding='utf-8-sig')
+                    try:
+                        load_cumulative_dashboard_data_v2.clear()
+                    except: pass
             except Exception as e:
                 status_text.error(f"⚠️ 영구 누적 저장 과정에서 Google Sheets API 에러가 발생했습니다: {e}")
             
@@ -1016,8 +1027,32 @@ with tab_daily:
     st.write("---")
     st.markdown("### 🖼️ 영구 누적 대시보드 (제이제이컴퍼니 신사업 프론티어)")
     
-    if os.path.exists(CUMULATIVE_FILE):
-        df_gallery = pd.read_csv(CUMULATIVE_FILE)
+    @st.cache_data(ttl=600, show_spinner=False)
+    def load_cumulative_dashboard_data_v2():
+        try:
+            client = get_gsheets_client()
+            if not client: return pd.DataFrame()
+            ws = get_or_create_worksheet(client, "Cumulative_Trends")
+            data = ws.get_all_records()
+            return pd.DataFrame(data) if data else pd.DataFrame()
+        except Exception as e:
+            print(f"구글 시트 로컬에서 읽기 에러: {e}")
+            return pd.DataFrame()
+            
+    # [V4.9.6] 화면 로드 시 먼저 구글 시트 클라우드 엑셀을 가장 우선으로 당겨옴
+    df_gallery = load_cumulative_dashboard_data_v2()
+    
+    # 만약 구글 시트에서 오류로 비어있다면, 로컬 엑셀 파일 백업본에서라도 복구
+    if df_gallery.empty and os.path.exists(CUMULATIVE_FILE):
+        try:
+            df_gallery = pd.read_csv(CUMULATIVE_FILE, encoding='utf-8-sig')
+        except: 
+            try:
+                df_gallery = pd.read_csv(CUMULATIVE_FILE, encoding='cp949')
+            except Exception as e:
+                print(f"로컬 파일 읽기 실패: {e}")
+    
+    if not df_gallery.empty:
         # 역순 정렬 (최신이 위로)
         df_gallery = df_gallery.iloc[::-1].reset_index(drop=True)
         st.write(df_gallery.to_html(escape=False, index=False, classes='table table-striped table-hover'), unsafe_allow_html=True)
