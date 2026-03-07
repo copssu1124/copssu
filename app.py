@@ -1059,7 +1059,7 @@ with tab_daily:
             if val_str.startswith('=IMAGE("'):
                 match = re.search(r'=IMAGE\("([^"]+)"\)', val_str)
                 if match:
-                    return f'<img src="{match.group(1)}" height="120" style="border-radius:10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">'
+                    return f'<img src="{match.group(1)}" height="130" style="border-radius:10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">'
             elif val_str.startswith('=HYPERLINK("'):
                 match = re.search(r'=HYPERLINK\("([^"]+)",\s*"([^"]+)"\)', val_str)
                 if match:
@@ -1074,21 +1074,19 @@ with tab_daily:
         # 역순 정렬 (최신이 위로)
         df_gallery = df_gallery.iloc[::-1].reset_index(drop=True)
         
-        # UI 가독성 향상 커스텀 CSS 강제 주입
-        custom_css = """
-        <style>
-        .custom-table table { width: 100%; text-align: center; }
-        .custom-table th { background-color: #f8f9fa; font-weight: bold; text-align: center !important; }
-        .custom-table td { vertical-align: middle !important; }
-        .custom-table th:nth-child(1) { width: 10%; } /* 발견일자 */
-        .custom-table th:nth-child(2) { width: 15%; } /* 카테고리 */
-        .custom-table th:nth-child(3) { width: 20%; font-size: 1.1em; } /* 키워드 */
-        .custom-table th:nth-child(4) { width: 30%; } /* 썸네일 */
-        .custom-table th:nth-child(5) { width: 25%; } /* 소싱 링크 */
-        </style>
-        """
+        # UI 가독성 향상 커스텀 CSS 강제 주입 (들여쓰기 제거 필수: 마크다운 코드블록 오인 방지)
+        custom_css = """<style>
+.custom-table table { width: 100%; text-align: center; }
+.custom-table th { background-color: #f8f9fa; font-weight: bold; text-align: center !important; }
+.custom-table td { vertical-align: middle !important; }
+.custom-table th:nth-child(1) { width: 10%; } /* 발견일자 */
+.custom-table th:nth-child(2) { width: 12%; } /* 카테고리 */
+.custom-table th:nth-child(3) { width: 15%; font-size: 1.1em; } /* 키워드 (축소) */
+.custom-table th:nth-child(4) { width: 43%; } /* 썸네일 (대폭 확대) */
+.custom-table th:nth-child(5) { width: 20%; } /* 소싱 링크 */
+</style>"""
         html_table = df_gallery.to_html(escape=False, index=False, classes='table table-striped table-hover')
-        st.markdown(custom_css + f'<div class="custom-table">{html_table}</div>', unsafe_allow_html=True)
+        st.write(custom_css + f'<div class="custom-table">{html_table}</div>', unsafe_allow_html=True)
     else:
         st.warning("아직 누적된 신사업 아이템 데이터가 없습니다. 상단 로직을 1회 이상 가동해 주십시오.")
 
