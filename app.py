@@ -767,7 +767,13 @@ with tab_scanner:
         if "다이렉트 소싱" in df_history.columns:
             df_history["다이렉트 소싱"] = df_history["다이렉트 소싱"].apply(parse_google_sheet_formula)
 
-        df_history = df_history.iloc[::-1].reset_index(drop=True)
+        # [V4.9.8] '접근 금지' 불량 아이템 은닉 및 PSS 스코어 최상위 랭크 정렬 
+        if "B2B/B2C 영업 타겟" in df_history.columns and "JJ_PSS(스코어)" in df_history.columns:
+            df_history = df_history[~df_history["B2B/B2C 영업 타겟"].str.contains("접근 금지", na=False)]
+            df_history["JJ_PSS(스코어)"] = pd.to_numeric(df_history["JJ_PSS(스코어)"], errors="coerce")
+            df_history = df_history.sort_values(by="JJ_PSS(스코어)", ascending=False).reset_index(drop=True)
+        else:
+            df_history = df_history.iloc[::-1].reset_index(drop=True)
         
         custom_css_scanner = """<style>
 .custom-table2 table { width: 100%; text-align: center; }
