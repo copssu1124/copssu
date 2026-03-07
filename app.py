@@ -50,17 +50,98 @@ components.html(
 st.markdown("""
 <meta name="google" content="notranslate">
 <style>
-    .reportview-container { background: #121212; color: #FFFFFF; }
-    .stTabs [data-baseweb="tab-list"] { gap: 10px; }
-    .stTabs [data-baseweb="tab"] { background-color: #2b2b2b; border-radius: 4px 4px 0 0; padding: 10px 20px; font-weight: bold; }
-    .stTabs [aria-selected="true"] { background-color: #4CAF50; color: white !important; }
-    hr { border: 1px solid #444; margin: 2rem 0; }
-    .highlight-card { background-color: #1e1e1e; padding: 20px; border-radius: 10px; border-left: 5px solid #4CAF50; margin-bottom: 1rem; }
-    .metric-value { font-size: 24px; font-weight: bold; color: #4CAF50; }
-    /* DataFrame 대신 사용할 Markdown 표 스타일 강제 */
-    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-    th { background-color: #333; color: #fff; padding: 10px; border: 1px solid #555; text-align: left; }
-    td { padding: 10px; border: 1px solid #555; background-color: #1e1e1e; color: #ddd; }
+    /* [V5.0 Neon Glassmorphism Premium Theme] */
+    
+    /* 1. 글로벌 우주 다크 배경 및 텍스트 */
+    .stApp {
+        background-color: #0b0c10;
+        color: #e0e6ed;
+        font-family: 'Pretendard', 'Malgun Gothic', dotum, sans-serif;
+    }
+    
+    /* 2. 상단 헤더 및 타이틀 네온 글로우 */
+    h1, h2, h3 {
+        color: #66fcf1 !important;
+        text-shadow: 0 0 10px rgba(102, 252, 241, 0.3);
+    }
+    
+    /* 3. 탭(Tab) 메뉴 UI 글래스모피즘 */
+    .stTabs [data-baseweb="tab-list"] { 
+        gap: 8px; 
+        background-color: rgba(31, 40, 51, 0.6);
+        padding: 5px;
+        border-radius: 12px;
+        backdrop-filter: blur(10px);
+    }
+    .stTabs [data-baseweb="tab"] { 
+        background-color: transparent; 
+        border-radius: 8px; 
+        padding: 12px 24px; 
+        font-weight: 700;
+        color: #c5c6c7;
+        transition: all 0.3s ease;
+        border: 1px solid transparent;
+    }
+    .stTabs [aria-selected="true"] { 
+        background: linear-gradient(135deg, #45a29e 0%, #66fcf1 100%);
+        color: #0b0c10 !important; 
+        box-shadow: 0 4px 15px rgba(102, 252, 241, 0.4);
+        border: 1px solid rgba(102, 252, 241, 0.5);
+    }
+    
+    /* 4. 버튼(Button) 사이버펑크 네온 호버 트랜지션 */
+    .stButton > button {
+        background: rgba(31, 40, 51, 0.8);
+        color: #66fcf1;
+        border: 1px solid #45a29e;
+        border-radius: 8px;
+        padding: 10px 20px;
+        font-weight: bold;
+        backdrop-filter: blur(5px);
+        transition: all 0.3s ease;
+    }
+    .stButton > button:hover {
+        background: linear-gradient(90deg, #45a29e, #66fcf1);
+        color: #0b0c10;
+        border-color: #66fcf1;
+        box-shadow: 0 0 20px rgba(102, 252, 241, 0.6);
+        transform: translateY(-2px);
+    }
+    
+    /* 5. 입력창(Input) 및 셀렉트박스 투명화 */
+    .stTextInput input, .stSelectbox > div[data-baseweb="select"] {
+        background-color: rgba(31, 40, 51, 0.5) !important;
+        color: #66fcf1 !important;
+        border: 1px solid #45a29e !important;
+        border-radius: 6px !important;
+    }
+    
+    /* 6. 정보 패널(하이라이트/Alert) 보석함 유리 질감 */
+    .highlight-card { 
+        background: rgba(31, 40, 51, 0.7); 
+        padding: 24px; 
+        border-radius: 12px; 
+        border-left: 6px solid #66fcf1; 
+        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        margin-bottom: 1.5rem; 
+    }
+    div[data-testid="stAlert"] {
+        background-color: rgba(31, 40, 51, 0.7) !important;
+        border: 1px solid #45a29e !important;
+        backdrop-filter: blur(5px);
+    }
+    
+    /* 7. 공통 Markdown / 기본 테이블 아크릴 질감 */
+    table { width: 100%; border-collapse: separate; border-spacing: 0; margin-top: 15px; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
+    th { background: rgba(69, 162, 158, 0.2); color: #66fcf1; padding: 15px; text-align: left; font-weight: 800; text-transform: uppercase; font-size: 0.9em; border-bottom: 2px solid #45a29e; }
+    td { padding: 12px 15px; background: rgba(31, 40, 51, 0.6); color: #c5c6c7; border-bottom: 1px solid rgba(69, 162, 158, 0.1); transition: background 0.3s ease; }
+    tr:hover td { background: rgba(69, 162, 158, 0.15); color: #ffffff; }
+    
+    /* 8. 구분선 네온 라인 */
+    hr { border-top: 1px solid rgba(102, 252, 241, 0.3); margin: 2.5rem 0; box-shadow: 0 0 10px rgba(102, 252, 241, 0.2); }
 </style>
 """, unsafe_allow_html=True)
 
