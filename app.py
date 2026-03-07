@@ -368,7 +368,39 @@ def get_multi_channel_tag(keyword, pss_score, is_fragile, avg_price):
 
 SEED_KEYWORDS = ["스티로폼 박스", "종이 아이스팩", "야자매트 35mm"]
 
-def analyze_item_metrics(keyword):
+SCANNER_HISTORY_FILE = os.path.join("data", "scanner_history.csv")
+
+@st.cache_data(ttl=600, show_spinner=False)
+def load_scanner_dashboard_data():
+    try:
+        client = get_gsheets_client()
+        if not client: return pd.DataFrame()
+        ws = get_or_create_worksheet(client, "Scanner_History")
+        data = ws.get_all_records()
+        return pd.DataFrame(data) if data else pd.DataFrame()
+    except Exception as e:
+        print(f"스캐너 구글 시트 에러: {e}")
+        return pd.DataFrame()
+
+def log_scanner_history(new_df):
+    try:
+        client = get_gsheets_client()
+        if not client: return
+        ws = get_or_create_worksheet(client, "Scanner_History")
+        exist_data = ws.get_all_records()
+        df_exist = pd.DataFrame(exist_data) if exist_data else pd.DataFrame()
+        df_merged = pd.concat([df_exist, new_df], ignore_index=True)
+        if not df_merged.empty:
+            df_merged.drop_duplicates(subset=['키워드'], keep='last', inplace=True)
+            ws.clear()
+            ws.update([df_merged.columns.values.tolist()] + df_merged.values.tolist())
+            df_merged.to_csv(SCANNER_HISTORY_FILE, index=False, encoding='utf-8-sig')
+            try: load_scanner_dashboard_data.clear()
+            except: pass
+    except Exception as e:
+        print("Scanner history log error:", e)
+
+def analyze_item_metrics(keyword, cat_name="수동 투입"):
     shop_url = "https://openapi.naver.com/v1/search/shop.json"
     shop_params = {"query": keyword, "display": 10} # [NEW V4.9.1] 10개 상품 조회해서 평균가격 파악
     shop_data = safe_api_request("GET", shop_url, params=shop_params, batch_mode=True)
@@ -377,12 +409,19 @@ def analyze_item_metrics(keyword):
         
     total_products = shop_data.get('total', 0)
     
-    # [NEW V4.9.1] 평균 판매 단가 산출
+    # [NEW V4.9.1] 평균 판매 단가 산출 및 [V4.9.7] 썸네일/링크 파싱
     avg_price = 0
+    img_link = ""
+    prod_link = ""
     if shop_data.get('items'):
-        prices = [int(item.get('lprice', 0)) for item in shop_data['items'] if item.get('lprice')]
+        items = shop_data['items']
+        prices = [int(item.get('lprice', 0)) for item in items if item.get('lprice')]
         if prices:
             avg_price = sum(prices) / len(prices)
+        if len(items) > 0:
+            item0 = items[0]
+            img_link = item0.get('image', '')
+            prod_link = item0.get('link', '')
          
     end_date = datetime.now()
     start_date = end_date - timedelta(days=30)
@@ -432,12 +471,16 @@ def analyze_item_metrics(keyword):
     tag = get_multi_channel_tag(keyword, pss_score, is_fragile, avg_price)
         
     return {
+        "발견일자": datetime.now().strftime("%Y-%m-%d"),
+        "대상 카테고리": cat_name,
         "키워드": keyword,
         "수요지수": round(search_score, 1),
         "경쟁자수(상품)": total_products,
         "평균단가": f"{int(avg_price):,}원",
         "JJ_PSS(스코어)": round(pss_score, 1),
-        "B2B/B2C 영업 타겟": tag
+        "B2B/B2C 영업 타겟": tag,
+        "상품 이미지": f'=IMAGE("{img_link}")' if img_link else "이미지 없음",
+        "다이렉트 소싱": f'=HYPERLINK("{prod_link}", "[ 🔗 상품 분석 창 열기 ]")' if prod_link else "링크 없음"
     }
 
 # V4.3 DataFrame 제거용 마크다운 변환 함수
@@ -632,7 +675,7 @@ with tab_scanner:
                     status_bar.info(f"🔄 **정밀 수익성 검증 중 ({i+1}/{len(target_kws)})** : [{ckey}번 검증기] ➣ `{kw}`")
                     
                     if kw not in SEED_KEYWORDS and is_valid_product_keyword(kw):
-                        row = analyze_item_metrics(kw)
+                        row = analyze_item_metrics(kw, target_cat)
                         if row is None: 
                             time.sleep(1.0)
                             continue
@@ -647,6 +690,7 @@ with tab_scanner:
                 if scan_res:
                     df_new = pd.DataFrame(scan_res)
                     st.session_state.scan_results = pd.concat([st.session_state.scan_results, df_new]).drop_duplicates(subset=['키워드'], keep='last')
+                    log_scanner_history(df_new)
                 
     with col_sc2:
         manual_input = st.text_input("수동 조사항목 추가 (관측 대상, 쉼표 구분)", "무지 박스, 포장용 랩")
@@ -655,11 +699,12 @@ with tab_scanner:
             scan_res = []
             for kw in m_list:
                 if kw not in SEED_KEYWORDS and is_valid_product_keyword(kw):
-                    row = analyze_item_metrics(kw)
+                    row = analyze_item_metrics(kw, "수동 투입")
                     if row: scan_res.append(row)
             if scan_res:
                 df_new = pd.DataFrame(scan_res)
                 st.session_state.scan_results = pd.concat([st.session_state.scan_results, df_new]).drop_duplicates(subset=['키워드'], keep='last')
+                log_scanner_history(df_new)
                 st.success(f"✅ {len(scan_res)}개 품목이 인덱스에 수동 추가되었습니다.")
                 
         st.write("---")
@@ -673,10 +718,76 @@ with tab_scanner:
     if not st.session_state.scan_results.empty:
         # PSS 점수가 가장 높은 갓성비/B2B 타겟 순으로 내림차순 정렬
         df_display = st.session_state.scan_results.sort_values(by="JJ_PSS(스코어)", ascending=False).reset_index(drop=True)
-        # V4.3 DataFrame 렌더링 에러 방지용 마크다운 변환
-        st.write(df_to_markdown_table(df_display), unsafe_allow_html=True)
+        # V4.3 DataFrame 렌더링 에러 방지용 마크다운 변환 대신 V4.9 HTML 렌더링
+        df_display_html = df_display.copy()
+        import re
+        def parse_google_sheet_formula_mini(val):
+            val_str = str(val)
+            if val_str.startswith('=IMAGE("'):
+                match = re.search(r'=IMAGE\("([^"]+)"\)', val_str)
+                if match: return f'<img src="{match.group(1)}" height="60" style="border-radius:6px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">'
+            elif val_str.startswith('=HYPERLINK("'):
+                match = re.search(r'=HYPERLINK\("([^"]+)",\s*"([^"]+)"\)', val_str)
+                if match: return f'<a href="{match.group(1)}" target="_blank" style="text-decoration:none;font-weight:bold;color:#1f77b4;background-color:#f0f2f6;padding:4px 8px;border-radius:4px;">{match.group(2)}</a>'
+            return val_str
+            
+        if "상품 이미지" in df_display_html.columns:
+            df_display_html["상품 이미지"] = df_display_html["상품 이미지"].apply(parse_google_sheet_formula_mini)
+        if "다이렉트 소싱" in df_display_html.columns:
+            df_display_html["다이렉트 소싱"] = df_display_html["다이렉트 소싱"].apply(parse_google_sheet_formula_mini)
+            
+        st.write(df_display_html.to_html(escape=False, index=False, classes='table table-striped table-hover'), unsafe_allow_html=True)
     else:
         st.write("관측된 신규 아이템 포트폴리오가 없습니다. 위 카테고리를 선택하고 🚀 딥스캔 빔을 발사해 주십시오.")
+        
+    st.write("---")
+    st.markdown("### 🖼️ 영구 누적 대시보드 (스캐너 발굴 기록 종합)")
+    
+    df_history = load_scanner_dashboard_data()
+    if df_history.empty and os.path.exists(SCANNER_HISTORY_FILE):
+        try: df_history = pd.read_csv(SCANNER_HISTORY_FILE, encoding='utf-8-sig')
+        except:
+            try: df_history = pd.read_csv(SCANNER_HISTORY_FILE, encoding='cp949')
+            except: pass
+            
+    if not df_history.empty:
+        import re
+        def parse_google_sheet_formula(val):
+            val_str = str(val)
+            if val_str.startswith('=IMAGE("'):
+                match = re.search(r'=IMAGE\("([^"]+)"\)', val_str)
+                if match: return f'<img src="{match.group(1)}" height="130" style="border-radius:10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">'
+            elif val_str.startswith('=HYPERLINK("'):
+                match = re.search(r'=HYPERLINK\("([^"]+)",\s*"([^"]+)"\)', val_str)
+                if match: return f'<a href="{match.group(1)}" target="_blank" style="text-decoration:none;font-weight:bold;color:#1f77b4;background-color:#f0f2f6;padding:5px 10px;border-radius:5px;">{match.group(2)}</a>'
+            return val_str
+            
+        if "상품 이미지" in df_history.columns:
+            df_history["상품 이미지"] = df_history["상품 이미지"].apply(parse_google_sheet_formula)
+        if "다이렉트 소싱" in df_history.columns:
+            df_history["다이렉트 소싱"] = df_history["다이렉트 소싱"].apply(parse_google_sheet_formula)
+
+        df_history = df_history.iloc[::-1].reset_index(drop=True)
+        
+        custom_css_scanner = """<style>
+.custom-table2 table { width: 100%; text-align: center; }
+.custom-table2 th { background-color: #f8f9fa; font-weight: bold; text-align: center !important; }
+.custom-table2 td { vertical-align: middle !important; }
+.custom-table2 th:nth-child(1) { width: 8%; } /* 발견일자 */
+.custom-table2 th:nth-child(2) { width: 8%; } /* 대상 카테고리 */
+.custom-table2 th:nth-child(3) { width: 10%; font-size: 1.1em; } /* 키워드 */
+.custom-table2 th:nth-child(4) { width: 6%; } /* 수요지수 */
+.custom-table2 th:nth-child(5) { width: 7%; } /* 경쟁자수 */
+.custom-table2 th:nth-child(6) { width: 7%; } /* 평균단가 */
+.custom-table2 th:nth-child(7) { width: 7%; } /* PSS */
+.custom-table2 th:nth-child(8) { width: 8%; } /* 마케팅타겟 */
+.custom-table2 th:nth-child(9) { width: 25%; } /* 상품 이미지 */
+.custom-table2 th:nth-child(10) { width: 14%; } /* 링크 */
+</style>"""
+        html_table = df_history.to_html(escape=False, index=False, classes='table table-striped table-hover')
+        st.write(custom_css_scanner + f'<div class="custom-table2">{html_table}</div>', unsafe_allow_html=True)
+    else:
+        st.info("💡 스캐너를 통해 발굴된 영구 데이터 스택이 아직 없습니다.")
 
 # ------------- [3] 경쟁 강도 및 채널 분석 탭 -------------
 with tab_content:
