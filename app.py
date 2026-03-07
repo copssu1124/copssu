@@ -1053,6 +1053,24 @@ with tab_daily:
                 print(f"로컬 파일 읽기 실패: {e}")
     
     if not df_gallery.empty:
+        import re
+        def parse_google_sheet_formula(val):
+            val_str = str(val)
+            if val_str.startswith('=IMAGE("'):
+                match = re.search(r'=IMAGE\("([^"]+)"\)', val_str)
+                if match:
+                    return f'<img src="{match.group(1)}" height="60" style="border-radius:8px;">'
+            elif val_str.startswith('=HYPERLINK("'):
+                match = re.search(r'=HYPERLINK\("([^"]+)",\s*"([^"]+)"\)', val_str)
+                if match:
+                    return f'<a href="{match.group(1)}" target="_blank" style="text-decoration:none;font-weight:bold;color:#1f77b4;background-color:#f0f2f6;padding:5px 10px;border-radius:5px;">{match.group(2)}</a>'
+            return val_str
+            
+        if "상품 이미지" in df_gallery.columns:
+            df_gallery["상품 이미지"] = df_gallery["상품 이미지"].apply(parse_google_sheet_formula)
+        if "다이렉트 소싱" in df_gallery.columns:
+            df_gallery["다이렉트 소싱"] = df_gallery["다이렉트 소싱"].apply(parse_google_sheet_formula)
+
         # 역순 정렬 (최신이 위로)
         df_gallery = df_gallery.iloc[::-1].reset_index(drop=True)
         st.write(df_gallery.to_html(escape=False, index=False, classes='table table-striped table-hover'), unsafe_allow_html=True)
