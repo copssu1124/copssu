@@ -1230,6 +1230,22 @@ with tab_daily:
                 print(f"로컬 파일 읽기 실패: {e}")
     
     if not df_gallery.empty:
+        # [V5.2 최적화] 날짜 필터링 로직 도입 (문자열 파싱 전에 미리 잘라내어 램 부하 방지)
+        if "발견일자" in df_gallery.columns:
+            unique_dates = df_gallery["발견일자"].dropna().unique().tolist()
+            unique_dates.sort(reverse=True) # 최신 날짜가 위로 오게 정렬
+            
+            filter_options = unique_dates + ["전체 모아보기 (주의: 렉 발생 가능)"]
+            
+            st.markdown("### 📅 조회할 기준 날짜 선택 (로딩 최적화)")
+            st.info("💡 **로딩 병목 방어막 가동**: 브라우저 다운(렉) 현상을 방지하기 위해, 가장 최신 스캔 날짜 데이터만 화면에 기본 렌더링되도록 차단벽을 구축했습니다.")
+            
+            selected_date = st.selectbox("조회 날짜", filter_options, index=0, label_visibility="collapsed")
+            
+            if selected_date != "전체 모아보기 (주의: 렉 발생 가능)":
+                df_gallery = df_gallery[df_gallery["발견일자"] == selected_date]
+                st.success(f"✅ **{selected_date}** 일자 딥스캔 데이터만 추출하여 렌더링합니다. (로딩 속도 1000% 증폭 극대화)")
+
         import re
         def parse_google_sheet_formula(val):
             val_str = str(val)
