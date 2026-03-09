@@ -50,22 +50,60 @@ if not st.session_state.logged_in:
     # 패스워드를 입력하거나 맞추기 전에는 하단 기존 관제탑 코드가 실행되지 않도록 완전히 차단
     st.stop()
 
-# [V6.0] 2단계: 신규 멀티 라우팅 (Navigation) 분기
-st.sidebar.markdown("""
-<div style='background: linear-gradient(135deg, rgba(0,229,255,0.15), rgba(0,119,255,0.15)); padding: 15px; border-radius: 10px; margin-bottom: 20px; border: 1px solid rgba(0,229,255,0.3);'>
-    <h3 style='color: #00e5ff; margin: 0; text-align: center; font-size: 1.1em;'>🎛️ 메인 디스패처 (V6.0)</h3>
-</div>
-""", unsafe_allow_html=True)
+# [V6.1] 2단계: 신규 멀티 라우팅 (Navigation) 분기 (메인 화면 선택 박스형)
+if "app_mode" not in st.session_state:
+    st.session_state.app_mode = None
 
-app_mode = st.sidebar.radio(
-    "디스패처 메뉴",
-    ["🏢 B2B 메인 관제탑", "📂 프라이빗 웹/파일 뷰어"],
-    label_visibility="collapsed"
-)
+if st.session_state.app_mode is None:
+    st.markdown("<br><br>", unsafe_allow_html=True)
+    st.markdown("<h2 style='text-align: center; color: #00e5ff; text-shadow: 0 0 10px rgba(0,229,255,0.5);'>🎛️ 제이제이컴퍼니 스마트 포털 디스패처</h2>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align: center; color: #8892b0; margin-bottom: 50px; font-size: 1.1em;'>원하시는 작업 공간(게이트웨이)을 선택해 주십시오.</p>", unsafe_allow_html=True)
+    
+    col1, col2, col3, col4 = st.columns([1, 4, 4, 1])
+    
+    with col2:
+        st.markdown("""
+        <div style='background: rgba(0,229,255,0.05); padding: 30px; border-radius: 15px; text-align: center; border: 2px solid rgba(0,229,255,0.3); height: 260px; display: flex; flex-direction: column; justify-content: center; margin-bottom: 20px;'>
+            <h1 style='font-size: 60px; margin-bottom: 10px;'>🏢</h1>
+            <h3 style='color: #00e5ff;'>B2B 메인 관제탑</h3>
+            <p style='color: #e0e6ed; font-size: 15px; margin-top: 10px;'>기존 1~6번 탭 기능을 제공하는<br>소싱 및 마케팅 핵심 코어</p>
+        </div>
+        """, unsafe_allow_html=True)
+        if st.button("🚀 관제탑에 접속하기", use_container_width=True, key="btn_tower"):
+            st.session_state.app_mode = "🏢 B2B 메인 관제탑"
+            st.rerun()
+
+    with col3:
+        st.markdown("""
+        <div style='background: rgba(255,107,107,0.05); padding: 30px; border-radius: 15px; text-align: center; border: 2px solid rgba(255,107,107,0.3); height: 260px; display: flex; flex-direction: column; justify-content: center; margin-bottom: 20px;'>
+            <h1 style='font-size: 60px; margin-bottom: 10px;'>📂</h1>
+            <h3 style='color: #ff6b6b;'>프라이빗 웹 / 파일 뷰어</h3>
+            <p style='color: #e0e6ed; font-size: 15px; margin-top: 10px;'>커스텀 HTML 렌더링 및<br>자유로운 파일 샌드박스 뷰어</p>
+        </div>
+        """, unsafe_allow_html=True)
+        if st.button("🚀 HTML/파일 뷰어에 접속하기", use_container_width=True, key="btn_viewer"):
+            st.session_state.app_mode = "📂 프라이빗 웹/파일 뷰어"
+            st.rerun()
+            
+    # 선택을 하기 전까지는 하단의 기존 로직이 실행되지 않도록 차단
+    st.stop()
+
+# =========================================================================
+# 선택 이후 사이드바 메뉴에 '선택 화면으로 돌아가기' 버튼 부착
+st.sidebar.markdown("""
+<div style='background: linear-gradient(135deg, rgba(0,229,255,0.15), rgba(0,119,255,0.15)); padding: 10px; border-radius: 10px; margin-bottom: 15px; border: 1px solid rgba(0,229,255,0.3);'>
+    <h4 style='color: #00e5ff; margin: 0; text-align: center;'>현재 모드: {}</h4>
+</div>
+""".format(st.session_state.app_mode.split()[1]), unsafe_allow_html=True)
+
+if st.sidebar.button("🔙 디스패처(선택 화면)로 돌아가기", use_container_width=True):
+    st.session_state.app_mode = None
+    st.rerun()
 
 st.sidebar.markdown("---")
 
-if app_mode == "📂 프라이빗 웹/파일 뷰어":
+
+if st.session_state.app_mode == "📂 프라이빗 웹/파일 뷰어":
     st.title("📂 프라이빗 웹/파일 뷰어")
     st.markdown("대표님께서 직접 올리시는 **HTML 코드, 마크다운 텍스트 문서, 장문의 소스 데이터 등을 넓은 단독 뷰에서 쾌적하게 렌더링하고 열람할 수 있는 독립형 작업 공간**입니다.")
     
