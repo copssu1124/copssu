@@ -14,7 +14,7 @@ from dotenv import load_dotenv
 from datetime import datetime, timedelta
 from pytrends.request import TrendReq
 from bs4 import BeautifulSoup
-import google.generativeai as genai
+from google import genai
 
 # .env 환경 변수 로드 (변경 시 덮어쓰기 허용)
 load_dotenv(override=True)
@@ -971,11 +971,10 @@ with tab_marketing:
             if not gemini_api_key:
                 st.error("🚨 환경 변수 오류: `.env` 파일에 `GEMINI_API_KEY`가 설정되어 있지 않습니다. 구글 AI 스튜디오에서 API 키를 발급받아 프로젝트 루트의 `.env`를 업데이트해 주십시오.")
             else:
-                genai.configure(api_key=gemini_api_key)
-                # 모델 설정 (Gemini 2.5 Pro 사용)
-                model = genai.GenerativeModel('gemini-2.5-pro') 
+                # 최신 google-genai 라이브러리 규격으로 클라이언트 초기화
+                client = genai.Client(api_key=gemini_api_key)
                 
-                with st.spinner("🧠 30대 B2B 마케터 AI(Gemini 1.5)가 지정하신 타겟과 9대 주력 채널 강점을 융합하여 완전히 새로운 마케팅 원고를 창작 중입니다... (약 10~20초 소요)"):
+                with st.spinner("🧠 30대 B2B 마케터 AI(Gemini 2.5)가 지정하신 타겟과 9대 주력 채널 강점을 융합하여 완전히 새로운 마케팅 원고를 창작 중입니다... (약 10~20초 소요)"):
                     
                     # 1. 3대 핵심 소구점 
                     str1 = "제이제이컴퍼니의 금산 자체 최신 공장 설비 라인을 통한 직생산"
@@ -1007,7 +1006,7 @@ with tab_marketing:
                         # 출력 레이아웃 프리셋
                         st.markdown(f"""
                         <div class="highlight-card">
-                            <h3>🤖 B2B 전문 AI (Gemini 1.5) 실시간 창작 중 ({target_platform.split(' ')[0]})</h3>
+                            <h3>🤖 B2B 전문 AI (Gemini 2.5) 실시간 창작 중 ({target_platform.split(' ')[0]})</h3>
                             <p><strong>주제:</strong> {ai_kw} | <strong>담당:</strong> 제이제이컴퍼니 30대 비즈니스 마케터 AI</p>
                         </div>
                         """, unsafe_allow_html=True)
@@ -1016,7 +1015,10 @@ with tab_marketing:
                         res_box = st.empty()
                         
                         # 메인 블로그 원고 실시간 스트리밍 생성 
-                        response = model.generate_content(prompt, stream=True)
+                        response = client.models.generate_content_stream(
+                            model='gemini-2.5-pro',
+                            contents=prompt
+                        )
                         final_blog_text = ""
                         for chunk in response:
                             final_blog_text += chunk.text
@@ -1052,7 +1054,10 @@ with tab_marketing:
                         [당근마켓]
                         (내용)
                         """
-                        sns_response = model.generate_content(sns_prompt)
+                        sns_response = client.models.generate_content(
+                            model='gemini-2.5-pro',
+                            contents=sns_prompt
+                        )
                         sns_text = sns_response.text
                         
                         # 정규식이나 split으로 AI 답변 파싱
