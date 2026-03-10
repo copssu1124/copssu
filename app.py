@@ -152,16 +152,20 @@ if st.session_state.app_mode == "🛠️ JANG's 마스터 툴":
         with col_s1:
             term = st.text_input("🕵️ 소싱 아이디어 입력", placeholder="예: 라탄 빨래바구니")
             if st.button("🚀 AI 분석 & 추가"):
-                with st.spinner("Gemini가 베트남 시장을 분석 중..."):
-                    client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
-                    prompt = f"Analyze '{term}' for Vietnam sourcing. Return JSON ONLY: {{'name': '한글명', 'category': '카테고리', 'icon': 'Emoji', 'labor': 1-10, 'score': 1-100, 'strategy': '한글설명', 'vnKey': '베트남어키워드'}}"
-                    res = client.models.generate_content(model="gemini-1.5-flash", contents=prompt)
-                    try:
-                        new_item = json.loads(re.sub(r'```json|```', '', res.text).strip())
-                        if "sourcing_db" not in st.session_state: st.session_state.sourcing_db = []
-                        st.session_state.sourcing_db.insert(0, new_item)
-                        st.success(f"✅ {new_item['name']} 분석 완료!")
-                    except: st.error("AI 응답 파싱 실패")
+                gemini_key = os.getenv("GEMINI_API_KEY") or st.secrets.get("GEMINI_API_KEY", None)
+                if not gemini_key:
+                    st.error("⚠️ GEMINI_API_KEY가 설정되지 않았습니다. Streamlit Cloud의 Secrets에 추가해 주세요.")
+                else:
+                    with st.spinner("Gemini가 베트남 시장을 분석 중..."):
+                        try:
+                            client = genai.Client(api_key=gemini_key)
+                            prompt = f"Analyze '{term}' for Vietnam sourcing. Return JSON ONLY: {{'name': '한글명', 'category': '카테고리', 'icon': 'Emoji', 'labor': 1-10, 'score': 1-100, 'strategy': '한글설명', 'vnKey': '베트남어키워드'}}"
+                            res = client.models.generate_content(model="gemini-1.5-flash", contents=prompt)
+                            new_item = json.loads(re.sub(r'```json|```', '', res.text).strip())
+                            if "sourcing_db" not in st.session_state: st.session_state.sourcing_db = []
+                            st.session_state.sourcing_db.insert(0, new_item)
+                            st.success(f"✅ {new_item['name']} 분석 완료!")
+                        except Exception as e: st.error(f"AI 분석 오류: {e}")
 
         # 기본 리스트 및 차트 영역
         if "sourcing_db" not in st.session_state or not st.session_state.sourcing_db:
@@ -292,10 +296,16 @@ if st.session_state.app_mode == "🏢 B2B 메인 관제탑":
         st.header("✍️ B2B 마케팅 AI")
         kw = st.text_input("홍보 품명 입력", "스티로폼 박스")
         if st.button("📝 원고 생성"):
-            with st.spinner("Gemini AI 매칭 중..."):
-                client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
-                res = client.models.generate_content(model="gemini-1.5-flash", contents=f"제이제이컴퍼니의 {kw} 마케팅 원고를 2000자 작성해줘.")
-                st.markdown(res.text)
+            gemini_key = os.getenv("GEMINI_API_KEY") or st.secrets.get("GEMINI_API_KEY", None)
+            if not gemini_key:
+                st.error("⚠️ GEMINI_API_KEY가 설정되지 않았습니다. Streamlit Cloud의 Secrets에 추가해 주세요.")
+            else:
+                with st.spinner("Gemini AI 매칭 중..."):
+                    try:
+                        client = genai.Client(api_key=gemini_key)
+                        res = client.models.generate_content(model="gemini-1.5-flash", contents=f"제이제이컴퍼니의 {kw} 마케팅 원고를 2000자 작성해줘.")
+                        st.markdown(res.text)
+                    except Exception as e: st.error(f"AI 생성 오류: {e}")
 
     if st.sidebar.button("🏠 메인으로 돌아가기"): st.session_state.app_mode = None; st.rerun()
     st.stop()
