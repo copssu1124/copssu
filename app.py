@@ -113,15 +113,22 @@ def load_api_keys():
     for i in range(1, 6):
         cid = os.getenv(f"CLIENT_ID_{i}")
         csec = os.getenv(f"CLIENT_SECRET_{i}")
+        # Streamlit Cloud Secrets fallback
+        if not cid:
+            try: cid = st.secrets.get(f"CLIENT_ID_{i}", None)
+            except: pass
+        if not csec:
+            try: csec = st.secrets.get(f"CLIENT_SECRET_{i}", None)
+            except: pass
         if cid and csec and cid.strip() != "" and "여기에" not in cid:
             keys.append({"num": i, "id": cid.strip(), "secret": csec.strip()})
     return keys
 
 API_KEYS = load_api_keys()
 
-if not API_KEYS:
-    st.error("⚠️ **유효한 API 키가 없습니다.** `.env` 파일에 `CLIENT_ID_1`, `CLIENT_SECRET_1` 등을 올바르게 설정해주세요.")
-    st.stop()
+# API 키가 없어도 앱은 계속 실행 (마스터 툴/뷰어 접근 허용)
+if not API_KEYS and st.session_state.get("app_mode") == "tower":
+    st.warning("⚠️ 네이버 API 키가 설정되지 않았습니다. 관제탑 스캐너 기능이 제한됩니다.")
     
 if 'key_idx' not in st.session_state:
     st.session_state.key_idx = 0
@@ -245,12 +252,15 @@ def flush_api_usage():
         save_local_api_usage(st.session_state.api_usage_cache)
 
 def get_rotating_client():
-    idx = st.session_state.key_idx
+    if not API_KEYS:
+        return 0, "", ""
+    idx = st.session_state.key_idx % len(API_KEYS)
     key = API_KEYS[idx]
     return key["num"], key["id"], key["secret"]
 
 def rotate_key():
-    st.session_state.key_idx = (st.session_state.key_idx + 1) % len(API_KEYS)
+    if API_KEYS:
+        st.session_state.key_idx = (st.session_state.key_idx + 1) % len(API_KEYS)
 
 def safe_api_request(method, url, headers=None, params=None, json_data=None, batch_mode=False):
     max_retries = len(API_KEYS)
@@ -1415,19 +1425,20 @@ with tab_google:
 # ==========================================
 # 7. 하단 실시간 Status Bar (비즈니스 관제 패널)
 # ==========================================
-st.sidebar.markdown("---")
-st.sidebar.markdown("### 📡 API 쿼터 관제 패널")
-current_key = get_rotating_client()[0]
-total_keys = len(API_KEYS)
+if API_KEYS:
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("### 📡 API 쿼터 관제 패널")
+    current_key = get_rotating_client()[0]
+    total_keys = len(API_KEYS)
+    st.sidebar.markdown(f"""
+    <div style="background-color:#1e1e1e; padding:15px; border-radius:8px; border-left:4px solid #4CAF50;">
+        <p style="margin:0; font-size:14px; color:#aaa;">활성 엑세스 토큰</p>
+        <p style="margin:5px 0 0 0; font-size:18px; font-weight:bold; color:#4CAF50;">메인 ID : {current_key} / {total_keys} 가동중 🟢</p>
+        <p style="margin:5px 0 0 0; font-size:12px; color:#ddd;">방어막: Error 429 감지 시 0.5s 자동 우회</p>
+        <p style="margin:5px 0 0 0; font-size:12px; color:#4CAF50;">네트워크 링크 안정성: 정상 보안 규격</p>
+    </div>
+    """, unsafe_allow_html=True)
 
-st.sidebar.markdown(f"""
-<div style="background-color:#1e1e1e; padding:15px; border-radius:8px; border-left:4px solid #4CAF50;">
-    <p style="margin:0; font-size:14px; color:#aaa;">활성 엑세스 토큰</p>
-    <p style="margin:5px 0 0 0; font-size:18px; font-weight:bold; color:#4CAF50;">메인 ID : {current_key} / {total_keys} 가동중 🟢</p>
-    <p style="margin:5px 0 0 0; font-size:12px; color:#ddd;">방어막: Error 429 감지 시 0.5s 자동 우회</p>
-    <p style="margin:5px 0 0 0; font-size:12px; color:#4CAF50;">네트워크 링크 안정성: 정상 보안 규격</p>
-</div>
-""", unsafe_allow_html=True)
 
 
 if st.session_state.app_mode == "tower":
