@@ -165,27 +165,167 @@ if st.session_state.app_mode == "master":
     # --- [TAB 1] 스마트스토어 분석기 ---
     with m_tabs[1]:
         st.markdown("### 📊 SmartStore Analyzer V21")
+        st.markdown("네이버 스마트스토어 상품의 **경쟁사 옵션/가격 구조**를 정밀 분석하고, 목표 마진에 따른 **최적 매입가**를 역산합니다.")
+        
+        # ===== 3단계 데이터 추출 가이드 (이미지 스타일 카드) =====
+        with st.expander("📖 데이터 추출 가이드 (클릭하여 펼치기)", expanded=False):
+            st.markdown("""
+            <div style="display: flex; gap: 16px; margin: 10px 0;">
+                <div style="flex:1; background: #fff; border-radius: 16px; padding: 24px 20px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.08); border: 1px solid #eee;">
+                    <div style="color: #e74c3c; font-weight: 800; font-size: 15px; margin-bottom: 8px;">❶ 1. 개발자 도구</div>
+                    <div style="color: #333; font-size: 14px; line-height: 1.7;">
+                        상품 페이지에서<br>
+                        <span style="background: #f8f9fa; padding: 2px 8px; border-radius: 4px; font-weight: 700; color: #000;">F12 키</span> 누르고
+                        <span style="background: #f8f9fa; padding: 2px 8px; border-radius: 4px; font-weight: 700; color: #000;">Network</span> 탭 클릭
+                    </div>
+                </div>
+                <div style="flex:1; background: #fff; border-radius: 16px; padding: 24px 20px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.08); border: 1px solid #eee;">
+                    <div style="color: #e67e22; font-weight: 800; font-size: 15px; margin-bottom: 8px;">❷ 2. 파일 찾기</div>
+                    <div style="color: #333; font-size: 14px; line-height: 1.7;">
+                        <span style="background: #f8f9fa; padding: 2px 8px; border-radius: 4px; font-weight: 700; color: #000;">F5</span> 새로고침 후<br>
+                        <span style="background: #fff3cd; padding: 2px 8px; border-radius: 4px; font-weight: 700; color: #856404;">bulk</span> 또는
+                        <span style="background: #fff3cd; padding: 2px 8px; border-radius: 4px; font-weight: 700; color: #856404;">withWindow</span> 파일 찾기
+                    </div>
+                </div>
+                <div style="flex:1; background: #fff; border-radius: 16px; padding: 24px 20px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.08); border: 1px solid #eee;">
+                    <div style="color: #27ae60; font-weight: 800; font-size: 15px; margin-bottom: 8px;">❸ 3. 복사</div>
+                    <div style="color: #333; font-size: 14px; line-height: 1.7;">
+                        <span style="background: #fff3cd; padding: 2px 8px; border-radius: 4px; font-weight: 700; color: #856404;">Response</span> 탭 내용<br>
+                        전체 복사해서 붙여넣기
+                    </div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+            st.caption("💡 **TIP**: 네이버 스마트스토어 상품 페이지(smartstore.naver.com)에 접속 후 위 과정을 따라하세요. `bulk` 또는 `withWindow`가 포함된 요청의 Response를 아래 텍스트 영역에 붙여넣으면 자동 분석됩니다.")
+        
+        st.write("---")
+        
+        # ===== 입력 영역 =====
         col_a1, col_a2 = st.columns([1, 2])
         with col_a1:
-            raw_data = st.text_area("📋 JSON 데이터 (bulk/withWindow)", height=300, placeholder="F12 -> Network -> Response 내용 복사")
+            raw_data = st.text_area("📋 JSON 데이터 붙여넣기", height=300, placeholder="위 가이드를 참고하여\nbulk 또는 withWindow의\nResponse 내용을\n전체 복사해서 붙여넣기")
             margin_rate = st.slider("🎯 목표 마진 (%)", 10, 80, 40)
-            fee_rate_a = st.number_input("수수료/광고비 합계 (%)", 0.0, 30.0, 9.0, key="fee_a")
+            fee_rate_a = st.number_input("💸 수수료/광고비 합계 (%)", 0.0, 30.0, 9.0, key="fee_a")
             
         with col_a2:
-            if st.button("🔍 데이터 분석 실행"):
+            if st.button("🔍 데이터 분석 실행", use_container_width=True):
                 if raw_data:
                     try:
-                        # 간이 파서 로직
-                        items = []
-                        if "optionCombinations" in raw_data:
-                            # 실제 정교한 파싱은 생략하되 핵심 기능 UI 구현
-                            st.success("데이터 파싱 성공! (V6.7.6 고도화 버전)")
-                            st.table(pd.DataFrame([
-                                {"옵션명": "기본형", "판매가": "15,000", "수익": "6,000", "목표매입가": "7,500"},
-                                {"옵션명": "고급형", "판매가": "25,000", "수익": "10,000", "목표매입가": "12,500"}
-                            ]))
-                    except: st.error("JSON 형식이 올바르지 않습니다.")
-                else: st.warning("데이터를 먼저 입력해주세요.")
+                        data = json.loads(raw_data)
+                        
+                        # 실제 스마트스토어 JSON 구조 파싱
+                        products = []
+                        
+                        # withWindow 형태 파싱
+                        if isinstance(data, dict):
+                            # 상품명 추출
+                            product_name = ""
+                            if "product" in data:
+                                product_name = data["product"].get("name", "")
+                            elif "name" in data:
+                                product_name = data.get("name", "")
+                            
+                            # 옵션 조합 추출
+                            options = []
+                            if "optionCombinations" in data:
+                                options = data["optionCombinations"]
+                            elif "product" in data and "optionCombinations" in data.get("product", {}):
+                                options = data["product"]["optionCombinations"]
+                            
+                            # 단일 상품 (옵션 없음)
+                            if not options:
+                                price = 0
+                                if "product" in data:
+                                    price = data["product"].get("salePrice", data["product"].get("price", 0))
+                                elif "salePrice" in data:
+                                    price = data.get("salePrice", data.get("price", 0))
+                                
+                                if price > 0:
+                                    fee = int(price * fee_rate_a / 100)
+                                    net = price - fee
+                                    target_cost = int(net * (1 - margin_rate / 100))
+                                    profit = net - target_cost
+                                    products.append({
+                                        "옵션명": product_name or "단일 상품",
+                                        "판매가": f"{int(price):,}원",
+                                        "수수료": f"{fee:,}원",
+                                        "순매출": f"{net:,}원",
+                                        "목표매입가": f"{target_cost:,}원",
+                                        "예상순이익": f"{profit:,}원",
+                                        "마진율": f"{margin_rate}%"
+                                    })
+                            
+                            # 옵션 조합 상품
+                            for opt in options:
+                                opt_name = opt.get("optionName1", "") or opt.get("name", "")
+                                if opt.get("optionName2"):
+                                    opt_name += " / " + opt["optionName2"]
+                                price = opt.get("price", opt.get("salePrice", 0))
+                                stock = opt.get("stockQuantity", opt.get("quantity", "N/A"))
+                                
+                                if price > 0:
+                                    fee = int(price * fee_rate_a / 100)
+                                    net = price - fee
+                                    target_cost = int(net * (1 - margin_rate / 100))
+                                    profit = net - target_cost
+                                    products.append({
+                                        "옵션명": opt_name,
+                                        "판매가": f"{int(price):,}원",
+                                        "수수료": f"{fee:,}원",
+                                        "순매출": f"{net:,}원",
+                                        "목표매입가": f"{target_cost:,}원",
+                                        "예상순이익": f"{profit:,}원",
+                                        "마진율": f"{margin_rate}%",
+                                        "재고": stock
+                                    })
+                        
+                        # bulk 형태 (리스트)
+                        elif isinstance(data, list):
+                            for item in data:
+                                if isinstance(item, dict):
+                                    name = item.get("name", item.get("productName", "상품"))
+                                    price = item.get("salePrice", item.get("price", 0))
+                                    if price > 0:
+                                        fee = int(price * fee_rate_a / 100)
+                                        net = price - fee
+                                        target_cost = int(net * (1 - margin_rate / 100))
+                                        profit = net - target_cost
+                                        products.append({
+                                            "옵션명": name[:30],
+                                            "판매가": f"{int(price):,}원",
+                                            "수수료": f"{fee:,}원",
+                                            "순매출": f"{net:,}원",
+                                            "목표매입가": f"{target_cost:,}원",
+                                            "예상순이익": f"{profit:,}원",
+                                            "마진율": f"{margin_rate}%"
+                                        })
+                        
+                        if products:
+                            st.success(f"✅ 총 **{len(products)}개** 옵션/상품 파싱 완료! (마진 {margin_rate}%, 수수료 {fee_rate_a}% 기준)")
+                            if product_name:
+                                st.markdown(f"**📦 상품명**: {product_name}")
+                            
+                            df_result = pd.DataFrame(products)
+                            st.dataframe(df_result, use_container_width=True, hide_index=True)
+                            
+                            # 요약 지표
+                            st.markdown("---")
+                            st.markdown("#### 📊 분석 요약")
+                            s1, s2, s3 = st.columns(3)
+                            prices = [int(p["판매가"].replace(",", "").replace("원", "")) for p in products if p["판매가"] != "0원"]
+                            targets = [int(p["목표매입가"].replace(",", "").replace("원", "")) for p in products if p["목표매입가"] != "0원"]
+                            if prices:
+                                s1.metric("평균 판매가", f"{int(sum(prices)/len(prices)):,}원")
+                                s2.metric("최저가 옵션", f"{min(prices):,}원")
+                                s3.metric("평균 목표매입가", f"{int(sum(targets)/len(targets)):,}원" if targets else "N/A")
+                        else:
+                            st.warning("⚠️ 파싱 가능한 상품/옵션 데이터를 찾지 못했습니다. JSON 형식을 확인해 주세요.")
+                    except json.JSONDecodeError:
+                        st.error("❌ JSON 형식이 올바르지 않습니다. Response 탭의 내용을 전체 복사했는지 확인해 주세요.")
+                    except Exception as e:
+                        st.error(f"❌ 분석 오류: {str(e)}")
+                else:
+                    st.warning("📋 데이터를 먼저 입력해주세요. 위의 '데이터 추출 가이드'를 참고하세요.")
 
     # --- [TAB 2] 수입 원가 계산기 ---
     with m_tabs[2]:
