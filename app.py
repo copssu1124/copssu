@@ -95,15 +95,24 @@ if st.session_state.app_mode is None:
     """, unsafe_allow_html=True)
     c1, c2, c3 = st.columns(3)
     with c1:
-        st.markdown('<div class="card-toss"><div><div class="card-icon">🏢</div><div class="card-name">B2B 관제탑</div><div class="card-desc">실시간 소싱 엔진과<br>마케팅 자동화 대시보드<br>(6대 카테고리 완전체)</div></div></div>', unsafe_allow_html=True)
-        if st.button("관제탑 접속", key="go_tower"): st.session_state.app_mode = "tower"; st.rerun()
+        if st.button("🏢\n\nB2B 관제탑\n\n실시간 소싱 엔진과\n마케팅 자동화 대시보드\n(6대 카테고리 완전체)", key="go_tower", use_container_width=True):
+            st.session_state.app_mode = "tower"; st.rerun()
     with c2:
-        st.markdown('<div class="card-toss"><div><div class="card-icon">🛠️</div><div class="card-name">마스터 툴</div><div class="card-desc">베트남 소싱 및 수입 원가<br>종합 분석 인텔리전스</div></div></div>', unsafe_allow_html=True)
-        if st.button("마스터 툴 열기", key="go_master"): st.session_state.app_mode = "master"; st.rerun()
+        if st.button("🛠️\n\n마스터 툴\n\n베트남 소싱 및 수입 원가\n종합 분석 인텔리전스", key="go_master", use_container_width=True):
+            st.session_state.app_mode = "master"; st.rerun()
     with c3:
-        st.markdown('<div class="card-toss"><div><div class="card-icon">📂</div><div class="card-name">프라이빗 뷰어</div><div class="card-desc">HTML 그래픽 렌더링 및<br>문서 편집 샌드박스</div></div></div>', unsafe_allow_html=True)
-        if st.button("뷰어 실행", key="go_viewer"): st.session_state.app_mode = "viewer"; st.rerun()
+        if st.button("📂\n\n프라이빗 뷰어\n\nHTML 그래픽 렌더링 및\n문서 편집 샌드박스", key="go_viewer", use_container_width=True):
+            st.session_state.app_mode = "viewer"; st.rerun()
     st.stop()
+
+# ==========================================
+# [공통] 메인으로 돌아가기 버튼 (항상 맨 위에 고정)
+# ==========================================
+if st.session_state.app_mode is not None:
+    if st.button("🏠 메인으로 돌아가기", key="back_to_main_top"):
+        st.session_state.app_mode = None
+        st.rerun()
+    st.markdown("---")
 
 # ==========================================
 # [모드 A] 마스터 툴 (관제탑보다 먼저 체크 → st.stop()으로 격리)
@@ -171,25 +180,25 @@ if st.session_state.app_mode == "master":
         with st.expander("📖 데이터 추출 가이드 (클릭하여 펼치기)", expanded=False):
             st.markdown("""
             <div style="display: flex; gap: 16px; margin: 10px 0;">
-                <div style="flex:1; background: #fff; border-radius: 16px; padding: 24px 20px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.08); border: 1px solid #eee;">
-                    <div style="color: #e74c3c; font-weight: 800; font-size: 15px; margin-bottom: 8px;">❶ 1. 개발자 도구</div>
-                    <div style="color: #333; font-size: 14px; line-height: 1.7;">
+                <div style="flex:1; background: #2c2d31; border-radius: 16px; padding: 24px 20px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.3); border: 1px solid #3a3b3f;">
+                    <div style="color: #ff6b6b; font-weight: 800; font-size: 15px; margin-bottom: 8px;">❶ 1. 개발자 도구</div>
+                    <div style="color: #e0e0e0; font-size: 14px; line-height: 1.7;">
                         상품 페이지에서<br>
-                        <span style="background: #f8f9fa; padding: 2px 8px; border-radius: 4px; font-weight: 700; color: #000;">F12 키</span> 누르고
-                        <span style="background: #f8f9fa; padding: 2px 8px; border-radius: 4px; font-weight: 700; color: #000;">Network</span> 탭 클릭
+                        <span style="background: #1b1c1f; padding: 2px 8px; border-radius: 4px; font-weight: 700; color: #fff;">F12 키</span> 누르고
+                        <span style="background: #1b1c1f; padding: 2px 8px; border-radius: 4px; font-weight: 700; color: #fff;">Network</span> 탭 클릭
                     </div>
                 </div>
-                <div style="flex:1; background: #fff; border-radius: 16px; padding: 24px 20px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.08); border: 1px solid #eee;">
-                    <div style="color: #e67e22; font-weight: 800; font-size: 15px; margin-bottom: 8px;">❷ 2. 파일 찾기</div>
-                    <div style="color: #333; font-size: 14px; line-height: 1.7;">
-                        <span style="background: #f8f9fa; padding: 2px 8px; border-radius: 4px; font-weight: 700; color: #000;">F5</span> 새로고침 후<br>
+                <div style="flex:1; background: #2c2d31; border-radius: 16px; padding: 24px 20px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.3); border: 1px solid #3a3b3f;">
+                    <div style="color: #ffa94d; font-weight: 800; font-size: 15px; margin-bottom: 8px;">❷ 2. 파일 찾기</div>
+                    <div style="color: #e0e0e0; font-size: 14px; line-height: 1.7;">
+                        <span style="background: #1b1c1f; padding: 2px 8px; border-radius: 4px; font-weight: 700; color: #fff;">F5</span> 새로고침 후<br>
                         <span style="background: #fff3cd; padding: 2px 8px; border-radius: 4px; font-weight: 700; color: #856404;">bulk</span> 또는
                         <span style="background: #fff3cd; padding: 2px 8px; border-radius: 4px; font-weight: 700; color: #856404;">withWindow</span> 파일 찾기
                     </div>
                 </div>
-                <div style="flex:1; background: #fff; border-radius: 16px; padding: 24px 20px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.08); border: 1px solid #eee;">
-                    <div style="color: #27ae60; font-weight: 800; font-size: 15px; margin-bottom: 8px;">❸ 3. 복사</div>
-                    <div style="color: #333; font-size: 14px; line-height: 1.7;">
+                <div style="flex:1; background: #2c2d31; border-radius: 16px; padding: 24px 20px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.3); border: 1px solid #3a3b3f;">
+                    <div style="color: #51cf66; font-weight: 800; font-size: 15px; margin-bottom: 8px;">❸ 3. 복사</div>
+                    <div style="color: #e0e0e0; font-size: 14px; line-height: 1.7;">
                         <span style="background: #fff3cd; padding: 2px 8px; border-radius: 4px; font-weight: 700; color: #856404;">Response</span> 탭 내용<br>
                         전체 복사해서 붙여넣기
                     </div>
@@ -382,9 +391,6 @@ if st.session_state.app_mode == "master":
         if st.button("📋 스크립트 전체 복사"):
             components.html(f"<script>navigator.clipboard.writeText(`{scraper_code_k}`); alert('코드가 복사되었습니다!');</script>", height=0)
 
-    if st.sidebar.button("🏠 메인으로 돌아가기"):
-        st.session_state.app_mode = None
-        st.rerun()
     st.stop()
 
 # ==========================================
@@ -399,7 +405,7 @@ if st.session_state.app_mode == "viewer":
     st.title("📂 프라이빗 뷰어")
     src = st.text_area("HTML Source", height=400)
     if st.button("🚀 렌더링"): components.html(src, height=800, scrolling=True)
-    if st.sidebar.button("🏠 메인으로 돌아가기"): st.session_state.app_mode = None; st.rerun()
+    st.stop()
 
 # ==========================================
 # [공통] V5.2 원본 엔진: API 통신 및 5중 키 로테이션
@@ -1731,6 +1737,4 @@ st.sidebar.markdown(f"""
 """, unsafe_allow_html=True)
 
 
-if st.sidebar.button("🏠 메인으로 돌아가기", key="back_tower"):
-    st.session_state.app_mode = None
-    st.rerun()
+
