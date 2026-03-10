@@ -369,13 +369,126 @@ if st.session_state.app_mode == "master":
         st.warning("1. map.kakao.com 접속 -> 2. F12 콘솔 열기 -> 3. 아래 코드 복사/붙여넣기")
         scraper_code_k = """// === 카카오맵 장바구니형 수동 수집기 V14.5 (최종) ===
 (function() {
+    // 1. 기존에 떠있는 리모컨이 있으면 삭제 (중복 방지)
     const oldBox = document.getElementById("k_cart_box");
     if (oldBox) oldBox.remove();
+
+    // 2. 리모컨 디자인 및 생성
     const box = document.createElement("div");
     box.id = "k_cart_box";
     box.style.cssText = "position: fixed; bottom: 20px; right: 20px; width: 300px; background: #2c3e50; color: #fff; z-index: 999999; padding: 20px; border-radius: 15px; font-family: 'Malgun Gothic', sans-serif; box-shadow: 0 10px 30px rgba(0,0,0,0.5);";
-    box.innerHTML = `<h3 style='margin:0 0 10px 0; color:#f1c40f; text-align:center;'>🛒 천막 채굴 장바구니</h3><button id='k_add_btn' style='width:100%; padding:15px; background:#e67e22; color:white; border:none; border-radius:8px;'>📸 현재 페이지 담기</button>`;
+    
+    box.innerHTML = `
+        <h3 style="margin:0 0 10px 0; color:#f1c40f; text-align:center; font-weight:bold;">🛒 천막 채굴 장바구니</h3>
+        <div style="background:#34495e; padding:10px; border-radius:10px; text-align:center; margin-bottom:15px;">
+            <div style="font-size:12px; color:#bdc3c7;">현재 담긴 업체</div>
+            <div id="k_count" style="font-size:28px; font-weight:bold; color:#2ecc71;">0</div>
+        </div>
+        
+        <button id="k_add_btn" style="width:100%; padding:15px; background:#e67e22; color:white; border:none; border-radius:8px; font-weight:bold; font-size:16px; cursor:pointer; margin-bottom:10px; box-shadow: 0 4px 0 #d35400;">📸 현재 페이지 담기</button>
+        <button id="k_down_btn" style="width:100%; padding:12px; background:#3498db; color:white; border:none; border-radius:8px; font-weight:bold; font-size:14px; cursor:pointer; box-shadow: 0 4px 0 #2980b9;">💾 엑셀로 털기</button>
+        
+        <div style="font-size:11px; color:#95a5a6; margin-top:10px; text-align:center;">
+            페이지를 넘긴 후 '담기'를 누르세요.<br>다 모으면 '엑셀로 털기' 클릭!
+        </div>
+    `;
     document.body.appendChild(box);
+
+    // 3. 데이터 저장할 변수들
+    let cart = [];
+    let seen = new Set(); // 중복 방지용
+
+    // 4. [담기] 버튼 클릭 시 동작
+    document.getElementById("k_add_btn").onclick = function() {
+        const items = document.querySelectorAll(".PlaceItem");
+        
+        // 목록이 안 보일 경우 알림
+        if (items.length === 0) {
+            alert("❌ 목록이 안 보입니다. 검색 결과가 화면에 있는지 확인해주세요!");
+            return;
+        }
+
+        let addedCount = 0;
+        
+        // 버튼 눌림 효과 (시각적 피드백)
+        const btn = document.getElementById("k_add_btn");
+        const originalText = btn.innerText;
+        btn.innerText = "⚡ 줍는 중...";
+        btn.style.background = "#f39c12";
+
+        // 데이터 긁어오기
+        items.forEach(item => {
+            try {
+                // 상호명 가져오기
+                let name = item.querySelector(".link_name").innerText.trim();
+                
+                // 중복이 아닐 경우에만 추가
+                if (name && !seen.has(name)) {
+                    // 주소 (도로명 우선, 줄바꿈 제거)
+                    let addr = item.querySelector(".addr").innerText.replace(/\\n/g, " ").trim();
+                    // 전화번호
+                    let phone = item.querySelector(".phone").innerText.trim();
+                    
+                    cart.push({ name, addr, phone });
+                    seen.add(name);
+                    addedCount++;
+                }
+            } catch(e) {}
+        });
+
+        // 화면 숫자 업데이트
+        document.getElementById("k_count").innerText = cart.length;
+
+        // 버튼 상태 복구 및 결과 표시
+        setTimeout(() => {
+            if (addedCount > 0) {
+                btn.innerText = `✅ $\{addedCount}개 추가됨!`;
+                btn.style.background = "#27ae60"; // 초록색
+            } else {
+                btn.innerText = `⚠️ 중복 또는 없음`;
+                btn.style.background = "#7f8c8d"; // 회색
+            }
+            
+            // 0.8초 뒤 원래 글자로 복귀
+            setTimeout(() => { 
+                btn.innerText = originalText; 
+                btn.style.background = "#e67e22";
+            }, 800);
+        }, 200);
+    };
+
+    // 5. [엑셀로 털기] 버튼 클릭 시 동작
+    document.getElementById("k_down_btn").onclick = function() {
+        if (cart.length === 0) {
+            alert("바구니가 비어있습니다. 데이터를 먼저 담아주세요.");
+            return;
+        }
+
+        // 파일명 생성 (예: 카카오_천막_총150개.csv)
+        let fileName = `카카오_천막_총$\{cart.length}개.csv`;
+        
+        // CSV 내용 만들기 (한글 깨짐 방지용 \\uFEFF 추가)
+        let csvContent = "\\uFEFF상호명,주소,전화번호\\n" + 
+            cart.map(e => `$\{e.name.replace(/,/g," ")},$\{e.addr.replace(/,/g," ")},$\{e.phone}`).join("\\n");
+        
+        // 다운로드 실행
+        let blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        let link = document.createElement("a");
+        let url = URL.createObjectURL(blob);
+        link.setAttribute("href", url);
+        link.setAttribute("download", fileName);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        // 다운로드 후 초기화 여부 묻기
+        if(confirm(`🎉 $\{cart.length}개 저장 완료!\\n\\n장바구니를 비울까요?\\n([취소]를 누르면 계속 이어서 모을 수 있습니다)`)) {
+            cart = [];
+            seen = new Set();
+            document.getElementById("k_count").innerText = "0";
+        }
+    };
+
 })();"""
         st.code(scraper_code_k, language="javascript")
         if st.button("📋 스크립트 전체 복사"):
