@@ -108,7 +108,7 @@ if st.session_state.app_mode is None:
 # ==========================================
 # [모드 A] 마스터 툴 (관제탑보다 먼저 체크 → st.stop()으로 격리)
 # ==========================================
-if st.session_state.app_mode == "🛠️ JANG's 마스터 툴":
+if st.session_state.app_mode == "master":
     st.markdown("<h1 style='text-align: center; color: #3182f6;'>🛠️ JANG's Master Tool (All-in-One)</h1>", unsafe_allow_html=True)
     m_tabs = st.tabs(["🇻🇳 베트남 소싱", "📊 스토어 분석", "🚢 수입 원가", "📈 셀러라이프", "🗺️ 카카오 채굴"])
     
@@ -255,7 +255,7 @@ if st.session_state.app_mode == "🛠️ JANG's 마스터 툴":
 # ==========================================
 # [모드 B] 프라이빗 뷰어 (관제탑보다 먼저 체크 → st.stop()으로 격리)
 # ==========================================
-if st.session_state.app_mode == "📂 프라이빗 웹/파일 뷰어":
+if st.session_state.app_mode == "viewer":
     st.title("📂 프라이빗 뷰어")
     src = st.text_area("HTML Source", height=400)
     if st.button("🚀 렌더링"): components.html(src, height=800, scrolling=True)
