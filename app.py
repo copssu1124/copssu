@@ -28,16 +28,6 @@ TOSS_STYLE = """
     * { font-family: 'Pretendard', sans-serif !important; }
     .stApp { background-color: #101214 !important; color: #ffffff !important; }
     .login-card, .dispatcher-container { text-align: center; padding: 60px 0; }
-    .card-toss {
-        background-color: #1b1c1f; padding: 40px 30px; border-radius: 28px;
-        text-align: center; border: 1px solid rgba(255,255,255,0.03);
-        transition: all 0.3s ease; cursor: pointer; height: 380px;
-        display: flex; flex-direction: column; justify-content: space-between;
-    }
-    .card-toss:hover { background-color: #222429; transform: translateY(-8px); border: 1px solid rgba(49, 130, 246, 0.3); }
-    .card-icon { font-size: 64px; margin-bottom: 20px; }
-    .card-name { color: #ffffff; font-size: 1.6rem; font-weight: 700; margin-bottom: 12px; }
-    .card-desc { color: #8b95a1; font-size: 14px; line-height: 1.6; }
     .stButton > button {
         background-color: #3182f6 !important; color: #ffffff !important;
         border-radius: 16px !important; border: none !important;
@@ -88,20 +78,41 @@ if "app_mode" not in st.session_state:
 
 if st.session_state.app_mode is None:
     st.markdown("""
-    <div class="dispatcher-container">
-        <h1 style="font-size: 3rem; font-weight: 800;">제이제이컴퍼니 스마트 포털</h1>
-        <p style="color: #8b95a1; font-size: 1.25rem; margin-bottom: 60px;">원하시는 작업 공간을 선택해 주세요</p>
+    <div style="text-align: center; padding: 40px 0 20px 0;">
+        <h1 style="font-size: 2.8rem; font-weight: 800; letter-spacing: -2px;">제이제이컴퍼니 스마트 포털</h1>
+        <p style="color: #8b95a1; font-size: 1.1rem; margin-bottom: 40px;">원하시는 작업 공간을 선택해 주세요</p>
     </div>
     """, unsafe_allow_html=True)
-    c1, c2, c3 = st.columns(3)
+    c1, c2, c3 = st.columns(3, gap="large")
     with c1:
-        if st.button("🏢\n\nB2B 관제탑\n\n실시간 소싱 엔진과\n마케팅 자동화 대시보드\n(6대 카테고리 완전체)", key="go_tower", use_container_width=True):
+        st.markdown("""
+        <div onclick="document.querySelector('[data-testid=\"stButton\"] button[kind=\"secondary\"]').click()" style="cursor:pointer; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 24px; padding: 40px 24px; text-align: center; transition: all 0.3s ease; min-height: 220px; display:flex; flex-direction:column; justify-content:center; align-items:center;">
+            <div style="font-size: 56px; margin-bottom: 16px;">🏢</div>
+            <div style="color: #fff; font-size: 1.4rem; font-weight: 700; margin-bottom: 8px;">B2B 관제탑</div>
+            <div style="color: rgba(255,255,255,0.75); font-size: 13px; line-height: 1.6;">실시간 소싱 엔진과<br>마케팅 자동화 대시보드<br>6대 카테고리 완전체</div>
+        </div>
+        """, unsafe_allow_html=True)
+        if st.button("관제탑 접속", key="go_tower", use_container_width=True):
             st.session_state.app_mode = "tower"; st.rerun()
     with c2:
-        if st.button("🛠️\n\n마스터 툴\n\n베트남 소싱 및 수입 원가\n종합 분석 인텔리전스", key="go_master", use_container_width=True):
+        st.markdown("""
+        <div style="cursor:pointer; background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); border-radius: 24px; padding: 40px 24px; text-align: center; transition: all 0.3s ease; min-height: 220px; display:flex; flex-direction:column; justify-content:center; align-items:center;">
+            <div style="font-size: 56px; margin-bottom: 16px;">🛠️</div>
+            <div style="color: #fff; font-size: 1.4rem; font-weight: 700; margin-bottom: 8px;">마스터 툴</div>
+            <div style="color: rgba(255,255,255,0.75); font-size: 13px; line-height: 1.6;">베트남 소싱 및 수입 원가<br>종합 분석 인텔리전스</div>
+        </div>
+        """, unsafe_allow_html=True)
+        if st.button("마스터 툴 열기", key="go_master", use_container_width=True):
             st.session_state.app_mode = "master"; st.rerun()
     with c3:
-        if st.button("📂\n\n프라이빗 뷰어\n\nHTML 그래픽 렌더링 및\n문서 편집 샌드박스", key="go_viewer", use_container_width=True):
+        st.markdown("""
+        <div style="cursor:pointer; background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); border-radius: 24px; padding: 40px 24px; text-align: center; transition: all 0.3s ease; min-height: 220px; display:flex; flex-direction:column; justify-content:center; align-items:center;">
+            <div style="font-size: 56px; margin-bottom: 16px;">📂</div>
+            <div style="color: #fff; font-size: 1.4rem; font-weight: 700; margin-bottom: 8px;">프라이빗 뷰어</div>
+            <div style="color: rgba(255,255,255,0.75); font-size: 13px; line-height: 1.6;">HTML 그래픽 렌더링 및<br>문서 편집 샌드박스</div>
+        </div>
+        """, unsafe_allow_html=True)
+        if st.button("뷰어 실행", key="go_viewer", use_container_width=True):
             st.session_state.app_mode = "viewer"; st.rerun()
     st.stop()
 
@@ -176,36 +187,15 @@ if st.session_state.app_mode == "master":
         st.markdown("### 📊 SmartStore Analyzer V21")
         st.markdown("네이버 스마트스토어 상품의 **경쟁사 옵션/가격 구조**를 정밀 분석하고, 목표 마진에 따른 **최적 매입가**를 역산합니다.")
         
-        # ===== 3단계 데이터 추출 가이드 (이미지 스타일 카드) =====
-        with st.expander("📖 데이터 추출 가이드 (클릭하여 펼치기)", expanded=False):
-            st.markdown("""
-            <div style="display: flex; gap: 16px; margin: 10px 0;">
-                <div style="flex:1; background: #2c2d31; border-radius: 16px; padding: 24px 20px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.3); border: 1px solid #3a3b3f;">
-                    <div style="color: #ff6b6b; font-weight: 800; font-size: 15px; margin-bottom: 8px;">❶ 1. 개발자 도구</div>
-                    <div style="color: #e0e0e0; font-size: 14px; line-height: 1.7;">
-                        상품 페이지에서<br>
-                        <span style="background: #1b1c1f; padding: 2px 8px; border-radius: 4px; font-weight: 700; color: #fff;">F12 키</span> 누르고
-                        <span style="background: #1b1c1f; padding: 2px 8px; border-radius: 4px; font-weight: 700; color: #fff;">Network</span> 탭 클릭
-                    </div>
-                </div>
-                <div style="flex:1; background: #2c2d31; border-radius: 16px; padding: 24px 20px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.3); border: 1px solid #3a3b3f;">
-                    <div style="color: #ffa94d; font-weight: 800; font-size: 15px; margin-bottom: 8px;">❷ 2. 파일 찾기</div>
-                    <div style="color: #e0e0e0; font-size: 14px; line-height: 1.7;">
-                        <span style="background: #1b1c1f; padding: 2px 8px; border-radius: 4px; font-weight: 700; color: #fff;">F5</span> 새로고침 후<br>
-                        <span style="background: #fff3cd; padding: 2px 8px; border-radius: 4px; font-weight: 700; color: #856404;">bulk</span> 또는
-                        <span style="background: #fff3cd; padding: 2px 8px; border-radius: 4px; font-weight: 700; color: #856404;">withWindow</span> 파일 찾기
-                    </div>
-                </div>
-                <div style="flex:1; background: #2c2d31; border-radius: 16px; padding: 24px 20px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.3); border: 1px solid #3a3b3f;">
-                    <div style="color: #51cf66; font-weight: 800; font-size: 15px; margin-bottom: 8px;">❸ 3. 복사</div>
-                    <div style="color: #e0e0e0; font-size: 14px; line-height: 1.7;">
-                        <span style="background: #fff3cd; padding: 2px 8px; border-radius: 4px; font-weight: 700; color: #856404;">Response</span> 탭 내용<br>
-                        전체 복사해서 붙여넣기
-                    </div>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-            st.caption("💡 **TIP**: 네이버 스마트스토어 상품 페이지(smartstore.naver.com)에 접속 후 위 과정을 따라하세요. `bulk` 또는 `withWindow`가 포함된 요청의 Response를 아래 텍스트 영역에 붙여넣으면 자동 분석됩니다.")
+        # ===== 3단계 데이터 추출 가이드 (스토어 분석에 필요한 JSON 데이터 추출 방법) =====
+        st.markdown("#### 📖 데이터 추출 가이드")
+        g1, g2, g3 = st.columns(3)
+        with g1:
+            st.info("❶ **1. 개발자 도구**\n\n상품 페이지에서\n**F12** 누르고 **Network** 탭 클릭")
+        with g2:
+            st.warning("❷ **2. 파일 찾기**\n\n**F5** 새로고침 후\n**bulk** 또는 **withWindow** 파일 찾기")
+        with g3:
+            st.success("❸ **3. 복사**\n\n**Response** 탭 내용\n전체 복사해서 붙여넣기")
         
         st.write("---")
         
