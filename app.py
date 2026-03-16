@@ -807,7 +807,7 @@ def get_multi_channel_tag(keyword, pss_score, is_fragile, avg_price):
     elif is_always:
         return "⚡ 올웨이즈/토스 (초저가/공동구매)"
     else:
-        return "📦 스마트스토어/자사몰 (일반 배송)"
+        return "📦 스마트스토어/쿠팡/자사몰 (일반 배송)"
 
 SEED_KEYWORDS = ["스티로폼 박스", "종이 아이스팩", "야자매트 35mm"]
 
@@ -1490,6 +1490,14 @@ with tab_daily:
         if past_folders:
             past_folders.sort(reverse=True) # 가장 최근 과거 폴더
             latest_past_dir = os.path.join(base_dir, past_folders[0])
+            
+        # [V4.6.1] 이전 누적 기록을 로드하여 완전히 처음 발견된 '✨ 신규발굴' 아이템 식별
+        try:
+            historic_data = get_or_create_worksheet(get_gsheets_client(), "Cumulative_Trends").get_all_records()
+            df_historic = pd.DataFrame(historic_data) if historic_data else pd.DataFrame()
+            historic_keywords = set(df_historic["신규 유망 키워드"].tolist()) if not df_historic.empty else set()
+        except:
+            historic_keywords = set()
         
         new_trends = [] # 누적할 신규 아이템 리스트
         
@@ -1518,8 +1526,13 @@ with tab_daily:
                         # 4. 이미지, 링크 파싱 (api rate limit 방어 위해 0.3s 슬립)
                         img, lnk = get_shopping_image(kw)
                         time.sleep(0.3)
+                        
+                        is_completely_new = kw not in historic_keywords
+                        badge = "✨ 신규발굴" if is_completely_new else "🚀 탑50재진입"
+                        
                         new_trends.append({
                             "발견일자": datetime.now().strftime("%Y-%m-%d"),
+                            "신규 상태": badge,
                             "대상 카테고리": c_name.split("(")[0].strip(),
                             "신규 유망 키워드": kw,
                             "상품 이미지": f'=IMAGE("{img}")' if img else "이미지 없음",
@@ -1633,8 +1646,11 @@ with tab_daily:
         if "다이렉트 소싱" in df_gallery.columns:
             df_gallery["다이렉트 소싱"] = df_gallery["다이렉트 소싱"].apply(parse_google_sheet_formula)
 
-        # 역순 정렬 (최신이 위로)
-        df_gallery = df_gallery.iloc[::-1].reset_index(drop=True)
+        # 역순 정렬 (최신이 위로) 및 신규 상태가 위로 오게 정렬
+        if "신규 상태" in df_gallery.columns:
+            df_gallery = df_gallery.sort_values(by=["신규 상태", "발견일자"], ascending=[False, False]).reset_index(drop=True)
+        else:
+            df_gallery = df_gallery.iloc[::-1].reset_index(drop=True)
         
         # UI 가독성 향상 커스텀 CSS 강제 주입 (들여쓰기 제거 필수: 마크다운 코드블록 오인 방지)
         custom_css = """<style>
@@ -1642,10 +1658,11 @@ with tab_daily:
 .custom-table th { background-color: #f8f9fa; font-weight: bold; text-align: center !important; }
 .custom-table td { vertical-align: middle !important; }
 .custom-table th:nth-child(1) { width: 10%; } /* 발견일자 */
-.custom-table th:nth-child(2) { width: 12%; } /* 카테고리 */
-.custom-table th:nth-child(3) { width: 15%; font-size: 1.1em; } /* 키워드 (축소) */
-.custom-table th:nth-child(4) { width: 43%; } /* 썸네일 (대폭 확대) */
-.custom-table th:nth-child(5) { width: 20%; } /* 소싱 링크 */
+.custom-table th:nth-child(2) { width: 10%; } /* 신규 상태 */
+.custom-table th:nth-child(3) { width: 12%; } /* 카테고리 */
+.custom-table th:nth-child(4) { width: 13%; font-size: 1.1em; } /* 키워드 (축소) */
+.custom-table th:nth-child(5) { width: 35%; } /* 썸네일 (대폭 확대) */
+.custom-table th:nth-child(6) { width: 20%; } /* 소싱 링크 */
 </style>"""
         html_table = df_gallery.to_html(escape=False, index=False, classes='table table-striped table-hover')
         st.write(custom_css + f'<div class="custom-table">{html_table}</div>', unsafe_allow_html=True)
