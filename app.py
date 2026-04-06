@@ -212,97 +212,105 @@ if st.session_state.app_mode == "master":
                     try:
                         data = json.loads(raw_data)
                         
-                        # 실제 스마트스토어 JSON 구조 파싱
-                        products = []
-                        
-                        # withWindow 형태 파싱
-                        if isinstance(data, dict):
-                            # 상품명 추출
-                            product_name = ""
-                            if "product" in data:
-                                product_name = data["product"].get("name", "")
-                            elif "name" in data:
-                                product_name = data.get("name", "")
-                            
-                            # 옵션 조합 추출
-                            options = []
-                            if "optionCombinations" in data:
-                                options = data["optionCombinations"]
-                            elif "product" in data and "optionCombinations" in data.get("product", {}):
-                                options = data["product"]["optionCombinations"]
-                            
-                            # 단일 상품 (옵션 없음)
-                            if not options:
-                                price = 0
-                                if "product" in data:
-                                    price = data["product"].get("salePrice", data["product"].get("price", 0))
-                                elif "salePrice" in data:
-                                    price = data.get("salePrice", data.get("price", 0))
+                        # 실제 스마트스토어 JSON 구조 파싱 (재귀 탐색으로 한계 극복)
+                        def extract_all_items(obj, b_price=0, b_name=""):
+                            found = []
+                            if isinstance(obj, dict):
+                                is_option = "optionName1" in obj or "optionName2" in obj
                                 
-                                if price > 0:
-                                    fee = int(price * fee_rate_a / 100)
-                                    net = price - fee
-                                    target_cost = int(net * (1 - margin_rate / 100))
-                                    profit = net - target_cost
-                                    products.append({
-                                        "옵션명": product_name or "단일 상품",
-                                        "판매가": f"{int(price):,}원",
-                                        "수수료": f"{fee:,}원",
-                                        "순매출": f"{net:,}원",
-                                        "목표매입가": f"{target_cost:,}원",
-                                        "예상순이익": f"{profit:,}원",
-                                        "마진율": f"{margin_rate}%"
-                                    })
-                            
-                            # 옵션 조합 상품
-                            for opt in options:
-                                opt_name = opt.get("optionName1", "") or opt.get("name", "")
-                                if opt.get("optionName2"):
-                                    opt_name += " / " + opt["optionName2"]
-                                price = opt.get("price", opt.get("salePrice", 0))
-                                stock = opt.get("stockQuantity", opt.get("quantity", "N/A"))
+                                cb_price = b_price
+                                cb_name = b_name
                                 
-                                if price > 0:
-                                    fee = int(price * fee_rate_a / 100)
-                                    net = price - fee
-                                    target_cost = int(net * (1 - margin_rate / 100))
-                                    profit = net - target_cost
-                                    products.append({
-                                        "옵션명": opt_name,
-                                        "판매가": f"{int(price):,}원",
-                                        "수수료": f"{fee:,}원",
-                                        "순매출": f"{net:,}원",
-                                        "목표매입가": f"{target_cost:,}원",
-                                        "예상순이익": f"{profit:,}원",
-                                        "마진율": f"{margin_rate}%",
-                                        "재고": stock
-                                    })
-                        
-                        # bulk 형태 (리스트)
-                        elif isinstance(data, list):
-                            for item in data:
-                                if isinstance(item, dict):
-                                    name = item.get("name", item.get("productName", "상품"))
-                                    price = item.get("salePrice", item.get("price", 0))
-                                    if price > 0:
-                                        fee = int(price * fee_rate_a / 100)
-                                        net = price - fee
-                                        target_cost = int(net * (1 - margin_rate / 100))
-                                        profit = net - target_cost
-                                        products.append({
-                                            "옵션명": name[:30],
-                                            "판매가": f"{int(price):,}원",
-                                            "수수료": f"{fee:,}원",
-                                            "순매출": f"{net:,}원",
-                                            "목표매입가": f"{target_cost:,}원",
-                                            "예상순이익": f"{profit:,}원",
-                                            "마진율": f"{margin_rate}%"
+                                if not is_option:
+                                    if "product" in obj and isinstance(obj["product"], dict):
+                                        p = obj["product"]
+                                        cb_price = p.get("salePrice", p.get("price", cb_price))
+                                        cb_name = p.get("name", p.get("productName", cb_name))
+                                    else:
+                                        if "salePrice" in obj: cb_price = obj.get("salePrice")
+                                        elif "price" in obj: cb_price = obj.get("price")
+                                            
+                                        if "name" in obj: cb_name = obj.get("name")
+                                        elif "productName" in obj: cb_name = obj.get("productName")
+                                
+                                if is_option:
+                                    opt_name = str(obj.get("optionName1", ""))
+                                    if obj.get("optionName2"): opt_name += " / " + str(obj.get("optionName2"))
+                                    if obj.get("optionName3"): opt_name += " / " + str(obj.get("optionName3"))
+                                    
+                                    try: add_price = int(obj.get("price", 0))
+                                    except: add_price = 0
+                                    
+                                    try: base_p = int(cb_price)
+                                    except: base_p = 0
+                                    
+                                    calc_price = base_p + add_price if base_p > 0 else add_price
+                                    if calc_price <= 0 and base_p > 0: calc_price = base_p
+                                    
+                                    full_name = f"{cb_name} - {opt_name}" if cb_name else opt_name
+                                    
+                                    if calc_price > 0:
+                                        found.append({
+                                            "옵션명": full_name,
+                                            "판매가": calc_price,
+                                            "재고": obj.get("stockQuantity", obj.get("quantity", "N/A"))
                                         })
+                                elif ("salePrice" in obj or "price" in obj) and ("name" in obj or "productName" in obj):
+                                    p = obj.get("salePrice", obj.get("price", 0))
+                                    n = obj.get("name", obj.get("productName", ""))
+                                    if isinstance(p, (int, float, str)):
+                                        try: p = int(p)
+                                        except: p = 0
+                                        if p > 0 and n and isinstance(n, str) and len(n) > 0:
+                                            # Skip if options are present (will be caught by children)
+                                            if "optionCombinations" not in obj and "options" not in obj:
+                                                found.append({
+                                                    "옵션명": n,
+                                                    "판매가": p,
+                                                    "재고": obj.get("stockQuantity", obj.get("quantity", "N/A"))
+                                                })
+                                                
+                                for k, v in obj.items():
+                                    if isinstance(v, (dict, list)):
+                                        found.extend(extract_all_items(v, cb_price, cb_name))
+                            
+                            elif isinstance(obj, list):
+                                for item in obj:
+                                    if isinstance(item, (dict, list)):
+                                        found.extend(extract_all_items(item, b_price, b_name))
+                                    
+                            return found
+                            
+                        raw_extracted = extract_all_items(data)
+                        
+                        products = []
+                        seen = set()
+                        for item in raw_extracted:
+                            sig = (item["옵션명"], item["판매가"])
+                            if sig not in seen:
+                                seen.add(sig)
+                                price = item["판매가"]
+                                fee = int(price * fee_rate_a / 100)
+                                net = price - fee
+                                target_cost = int(net * (1 - margin_rate / 100))
+                                profit = net - target_cost
+                                products.append({
+                                    "옵션명": item["옵션명"],
+                                    "판매가": f"{int(price):,}원",
+                                    "수수료": f"{fee:,}원",
+                                    "순매출": f"{net:,}원",
+                                    "목표매입가": f"{target_cost:,}원",
+                                    "예상순이익": f"{profit:,}원",
+                                    "마진율": f"{margin_rate}%",
+                                    "재고": item["재고"]
+                                })
                         
                         if products:
                             st.success(f"✅ 총 **{len(products)}개** 옵션/상품 파싱 완료! (마진 {margin_rate}%, 수수료 {fee_rate_a}% 기준)")
-                            if product_name:
-                                st.markdown(f"**📦 상품명**: {product_name}")
+                            
+                            main_product_name = products[0]["옵션명"].split(" - ")[0] if " - " in products[0]["옵션명"] else "종합 포트폴리오"
+                            if len(products) > 0:
+                                st.markdown(f"**📦 기준 상품명**: {main_product_name}")
                             
                             df_result = pd.DataFrame(products)
                             st.dataframe(df_result, use_container_width=True, hide_index=True)
