@@ -213,75 +213,123 @@ if st.session_state.app_mode == "master":
                         data = json.loads(raw_data)
                         
                         # 실제 스마트스토어 JSON 구조 파싱 (재귀 탐색으로 한계 극복)
-                        def extract_all_items(obj, b_price=0, b_name=""):
-                            found = []
+                        def an_find_base_price(obj):
+                            if not isinstance(obj, dict): return 0
+                            if "product" in obj and isinstance(obj["product"], dict) and "salePrice" in obj["product"]:
+                                return obj["product"].get("discountedSalePrice") or obj["product"].get("salePrice") or 0
+                            if "benefitsView" in obj and isinstance(obj["benefitsView"], dict) and "discountedSalePrice" in obj["benefitsView"]:
+                                return obj["benefitsView"]["discountedSalePrice"]
+                            if "discountedSalePrice" in obj: return obj.get("discountedSalePrice")
+                            if "salePrice" in obj: return obj.get("salePrice")
+                            
+                            found_val = 0
+                            def search(node):
+                                nonlocal found_val
+                                if found_val > 0 or not isinstance(node, (dict, list)): return
+                                if isinstance(node, list):
+                                    for child in node: search(child)
+                                elif isinstance(node, dict):
+                                    if "benefitsView" in node and isinstance(node["benefitsView"], dict) and "discountedSalePrice" in node["benefitsView"]:
+                                        found_val = node["benefitsView"]["discountedSalePrice"]
+                                        return
+                                    if "discountedSalePrice" in node or "salePrice" in node:
+                                        found_val = node.get("discountedSalePrice") or node.get("salePrice") or 0
+                                        return
+                                    for v in node.values(): search(v)
+                            search(obj)
+                            return found_val
+
+                        def an_find_options(obj, found_list, b_name=""):
+                            if not isinstance(obj, (dict, list)): return
                             if isinstance(obj, dict):
-                                is_option = "optionName1" in obj or "optionName2" in obj
+                                local_name = str(obj.get("name", obj.get("productName", b_name)))
                                 
-                                cb_price = b_price
-                                cb_name = b_name
-                                
-                                if not is_option:
-                                    if "product" in obj and isinstance(obj["product"], dict):
-                                        p = obj["product"]
-                                        cb_price = p.get("salePrice", p.get("price", cb_price))
-                                        cb_name = p.get("name", p.get("productName", cb_name))
-                                    else:
-                                        if "salePrice" in obj: cb_price = obj.get("salePrice")
-                                        elif "price" in obj: cb_price = obj.get("price")
-                                            
-                                        if "name" in obj: cb_name = obj.get("name")
-                                        elif "productName" in obj: cb_name = obj.get("productName")
-                                
-                                if is_option:
-                                    opt_name = str(obj.get("optionName1", ""))
-                                    if obj.get("optionName2"): opt_name += " / " + str(obj.get("optionName2"))
-                                    if obj.get("optionName3"): opt_name += " / " + str(obj.get("optionName3"))
-                                    
-                                    try: add_price = int(obj.get("price", 0))
-                                    except: add_price = 0
-                                    
-                                    try: base_p = int(cb_price)
-                                    except: base_p = 0
-                                    
-                                    calc_price = base_p + add_price if base_p > 0 else add_price
-                                    if calc_price <= 0 and base_p > 0: calc_price = base_p
-                                    
-                                    full_name = f"{cb_name} - {opt_name}" if cb_name else opt_name
-                                    
-                                    if calc_price > 0:
-                                        found.append({
-                                            "옵션명": full_name,
-                                            "판매가": calc_price,
-                                            "재고": obj.get("stockQuantity", obj.get("quantity", "N/A"))
+                                if "optionCombinations" in obj and isinstance(obj["optionCombinations"], list):
+                                    for opt in obj["optionCombinations"]:
+                                        names = [str(opt.get(f"optionName{i}", "")) for i in range(1, 4) if opt.get(f"optionName{i}")]
+                                        opt_s = " / ".join(filter(bool, names))
+                                        full_name = f"{local_name} - {opt_s}" if local_name and opt_s else (opt_s or local_name)
+                                        found_list.append({
+                                            "type": "메인",
+                                            "name": full_name,
+                                            "price": opt.get("price", 0),
+                                            "stock": opt.get("stockQuantity", opt.get("quantity", "N/A"))
                                         })
-                                elif ("salePrice" in obj or "price" in obj) and ("name" in obj or "productName" in obj):
-                                    p = obj.get("salePrice", obj.get("price", 0))
-                                    n = obj.get("name", obj.get("productName", ""))
-                                    if isinstance(p, (int, float, str)):
-                                        try: p = int(p)
-                                        except: p = 0
-                                        if p > 0 and n and isinstance(n, str) and len(n) > 0:
-                                            # Skip if options are present (will be caught by children)
-                                            if "optionCombinations" not in obj and "options" not in obj:
-                                                found.append({
-                                                    "옵션명": n,
-                                                    "판매가": p,
-                                                    "재고": obj.get("stockQuantity", obj.get("quantity", "N/A"))
-                                                })
-                                                
+                                        
+                                if "simpleOptions" in obj and isinstance(obj["simpleOptions"], list):
+                                    for opt in obj["simpleOptions"]:
+                                        opt_s = str(opt.get("name", ""))
+                                        full_name = f"{local_name} - {opt_s}" if local_name and opt_s else (opt_s or local_name)
+                                        found_list.append({
+                                            "type": "단순",
+                                            "name": full_name,
+                                            "price": opt.get("price", 0),
+                                            "stock": opt.get("stockQuantity", opt.get("quantity", "N/A"))
+                                        })
+                                        
+                                if "supplementProducts" in obj and isinstance(obj["supplementProducts"], list):
+                                    for opt in obj["supplementProducts"]:
+                                        opt_s = str(opt.get("name", ""))
+                                        full_name = f"{local_name} - {opt_s}" if local_name and opt_s else (opt_s or local_name)
+                                        found_list.append({
+                                            "type": "추가",
+                                            "name": full_name,
+                                            "price": opt.get("price", 0),
+                                            "stock": opt.get("stockQuantity", opt.get("quantity", "N/A")),
+                                            "is_supp": True
+                                        })
+
+                                if ("salePrice" in obj or "price" in obj or "discountedSalePrice" in obj) and ("name" in obj or "productName" in obj):
+                                    if "optionCombinations" not in obj and "options" not in obj and "standardCombinations" not in obj and "simpleOptions" not in obj:
+                                        p_val = obj.get("discountedSalePrice") or obj.get("salePrice") or obj.get("price") or 0
+                                        n_val = str(obj.get("name", obj.get("productName", "")))
+                                        if isinstance(p_val, (int, float, str)):
+                                            try: p_val = int(p_val)
+                                            except: p_val = 0
+                                        if int(p_val) > 0 and n_val != "":
+                                            found_list.append({
+                                                "type": "단품",
+                                                "name": n_val,
+                                                "price": 0,
+                                                "full_price": p_val,
+                                                "stock": obj.get("stockQuantity", obj.get("quantity", "N/A")),
+                                                "is_full": True
+                                            })
+                                            
                                 for k, v in obj.items():
                                     if isinstance(v, (dict, list)):
-                                        found.extend(extract_all_items(v, cb_price, cb_name))
-                            
+                                        an_find_options(v, found_list, local_name)
                             elif isinstance(obj, list):
                                 for item in obj:
                                     if isinstance(item, (dict, list)):
-                                        found.extend(extract_all_items(item, b_price, b_name))
-                                    
-                            return found
-                            
-                        raw_extracted = extract_all_items(data)
+                                        an_find_options(item, found_list, b_name)
+
+                        # HTML V21의 자바스크립트 로직 완벽 이식
+                        global_base_price = 0
+                        if isinstance(data, dict): global_base_price = an_find_base_price(data)
+                        try: global_base_price = int(global_base_price)
+                        except: global_base_price = 0
+
+                        raw_extracted = []
+                        if isinstance(data, list):
+                            for item in data:
+                                b_p = an_find_base_price(item)
+                                try: b_p = int(b_p)
+                                except: b_p = 0
+                                temp_found = []
+                                an_find_options(item, temp_found, "")
+                                for t in temp_found:
+                                    calc_p = t.get("full_price", b_p + int(t["price"])) if t.get("is_full") else (int(t["price"]) if t.get("is_supp") else b_p + int(t["price"]))
+                                    if calc_p <= 0 and b_p > 0: calc_p = b_p
+                                    raw_extracted.append({"옵션명": t["name"], "기본가": b_p, "옵션가": int(t["price"]), "판매가": calc_p, "재고": t["stock"]})
+                        else:
+                            temp_found = []
+                            an_find_options(data, temp_found, "")
+                            for t in temp_found:
+                                calc_p = t.get("full_price", global_base_price + int(t["price"])) if t.get("is_full") else (int(t["price"]) if t.get("is_supp") else global_base_price + int(t["price"]))
+                                if calc_p <= 0 and global_base_price > 0: calc_p = global_base_price
+                                raw_extracted.append({"옵션명": t["name"], "기본가": global_base_price, "옵션가": int(t["price"]), "판매가": calc_p, "재고": t["stock"]})
+
                         
                         products = []
                         seen = set()
@@ -290,13 +338,20 @@ if st.session_state.app_mode == "master":
                             if sig not in seen:
                                 seen.add(sig)
                                 price = item["판매가"]
+                                base_p = item.get("기본가", price)
+                                opt_p = item.get("옵션가", 0)
+                                opt_sign = f"+{opt_p:,}" if opt_p > 0 else f"{opt_p:,}"
+                                opt_str = "없음" if opt_p == 0 else f"{opt_sign}원"
+                                
                                 fee = int(price * fee_rate_a / 100)
                                 net = price - fee
                                 target_cost = int(net * (1 - margin_rate / 100))
                                 profit = net - target_cost
                                 products.append({
                                     "옵션명": item["옵션명"],
-                                    "판매가": f"{int(price):,}원",
+                                    "기본판매가": f"{int(base_p):,}원",
+                                    "옵션추가금": opt_str,
+                                    "최종판매가": f"{int(price):,}원",
                                     "수수료": f"{fee:,}원",
                                     "순매출": f"{net:,}원",
                                     "목표매입가": f"{target_cost:,}원",
@@ -310,7 +365,8 @@ if st.session_state.app_mode == "master":
                             
                             main_product_name = products[0]["옵션명"].split(" - ")[0] if " - " in products[0]["옵션명"] else "종합 포트폴리오"
                             if len(products) > 0:
-                                st.markdown(f"**📦 기준 상품명**: {main_product_name}")
+                                top_base_price = products[0]["기본판매가"]
+                                st.markdown(f"**📦 기준 상품명**: {main_product_name} &nbsp;|&nbsp; **💵 탐지된 기본 판매가**: <span style='color:#3182f6; font-size:1.1em;'>{top_base_price}</span>", unsafe_allow_html=True)
                             
                             df_result = pd.DataFrame(products)
                             st.dataframe(df_result, use_container_width=True, hide_index=True)
@@ -319,7 +375,7 @@ if st.session_state.app_mode == "master":
                             st.markdown("---")
                             st.markdown("#### 📊 분석 요약")
                             s1, s2, s3 = st.columns(3)
-                            prices = [int(p["판매가"].replace(",", "").replace("원", "")) for p in products if p["판매가"] != "0원"]
+                            prices = [int(p["최종판매가"].replace(",", "").replace("원", "")) for p in products if p["최종판매가"] != "0원"]
                             targets = [int(p["목표매입가"].replace(",", "").replace("원", "")) for p in products if p["목표매입가"] != "0원"]
                             if prices:
                                 s1.metric("평균 판매가", f"{int(sum(prices)/len(prices)):,}원")
