@@ -12,6 +12,7 @@ from datetime import datetime, timedelta
 from dotenv import load_dotenv
 from google import genai
 from bs4 import BeautifulSoup
+from auto_collector_tab import render_auto_collector_tab
 
 # [V4.9.6 Hotfix] Streamlit 실행 디렉터리 이슈로 작업 폴더 강제 고정
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
@@ -130,7 +131,7 @@ if st.session_state.app_mode is not None:
 # ==========================================
 if st.session_state.app_mode == "master":
     st.markdown("<h1 style='text-align: center; color: #3182f6;'>🛠️ JANG's Master Tool (All-in-One)</h1>", unsafe_allow_html=True)
-    m_tabs = st.tabs(["🇻🇳 베트남 소싱", "📊 스토어 분석", "🚢 수입 원가", "📈 셀러라이프", "🗺️ 카카오 채굴"])
+    m_tabs = st.tabs(["🇻🇳 베트남 소싱", "📊 스토어 분석", "🚢 수입 원가", "📈 셀러라이프", "🗺️ 카카오 채굴", "🚀 자동 수집기"])
     
     # --- [TAB 0] 베트남 소싱 발굴기 ---
     with m_tabs[0]:
@@ -557,6 +558,10 @@ if st.session_state.app_mode == "master":
         st.code(scraper_code_k, language="javascript")
         if st.button("📋 스크립트 전체 복사"):
             components.html(f"<script>navigator.clipboard.writeText(`{scraper_code_k}`); alert('코드가 복사되었습니다!');</script>", height=0)
+
+    # --- [TAB 5] 자동 수집기 (Phase 1 — URL 한 개로 옵션 자동 수집) ---
+    with m_tabs[5]:
+        render_auto_collector_tab()
 
     st.stop()
 
