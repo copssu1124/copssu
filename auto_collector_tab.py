@@ -1,6 +1,7 @@
 """자동 수집기 탭 (Phase 1) — 마스터 툴 새 탭 UI"""
 import json
 import streamlit as st
+import requests
 import pandas as pd
 
 from smartstore_auto import auto_collect, sanitize_cookie
@@ -14,12 +15,15 @@ except Exception:
 
 
 def _get_local_storage():
-    """LocalStorage 인스턴스를 한 번만 생성 (cache_resource)."""
+    """LocalStorage 인스턴스를 한 번만 생성 (실패해도 앱 안 죽도록 안전 강화)."""
     if not _LOCAL_STORAGE_OK:
         return None
     if "_local_storage_instance" not in st.session_state:
-        st.session_state["_local_storage_instance"] = LocalStorage()
-    return st.session_state["_local_storage_instance"]
+        try:
+            st.session_state["_local_storage_instance"] = LocalStorage()
+        except Exception:
+            st.session_state["_local_storage_instance"] = None
+    return st.session_state.get("_local_storage_instance")
 
 
 def _calc_final_prices(data):
@@ -181,7 +185,11 @@ button[kind="headerNoPadding"] [class*="material"] {
 
     user_cookie = st.session_state.get("naver_cookie_user", "").strip() or None
     with st.spinner("📡 자동 수집 중..."):
-        result = auto_collect(url.strip(), user_cookie=user_cookie)
+        # 전역 세션 공유 (자동/일괄/키워드 수집기 모두 같은 브라우저 패턴으로 보이게)
+        if "shared_naver_session" not in st.session_state:
+            st.session_state["shared_naver_session"] = requests.Session()
+        shared_sess = st.session_state["shared_naver_session"]
+        result = auto_collect(url.strip(), user_cookie=user_cookie, session=shared_sess)
 
     with st.expander("📋 진행 로그", expanded=not result["ok"]):
         for step in result["steps"]:

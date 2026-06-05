@@ -13,6 +13,8 @@ from dotenv import load_dotenv
 from google import genai
 from bs4 import BeautifulSoup
 from auto_collector_tab import render_auto_collector_tab
+from bulk_collector_tab import render_bulk_collector_tab
+from keyword_collector_tab import render_keyword_collector_tab
 
 # [V4.9.6 Hotfix] Streamlit 실행 디렉터리 이슈로 작업 폴더 강제 고정
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
@@ -131,7 +133,7 @@ if st.session_state.app_mode is not None:
 # ==========================================
 if st.session_state.app_mode == "master":
     st.markdown("<h1 style='text-align: center; color: #3182f6;'>🛠️ JANG's Master Tool (All-in-One)</h1>", unsafe_allow_html=True)
-    m_tabs = st.tabs(["🇻🇳 베트남 소싱", "📊 스토어 분석", "🚢 수입 원가", "📈 셀러라이프", "🗺️ 카카오 채굴", "🚀 자동 수집기"])
+    m_tabs = st.tabs(["🇻🇳 베트남 소싱", "📊 스토어 분석", "🚢 수입 원가", "📈 셀러라이프", "🗺️ 카카오 채굴", "🚀 자동 수집기", "🚛 일괄 수집기", "🔍 키워드 수집기"])
     
     # --- [TAB 0] 베트남 소싱 발굴기 ---
     with m_tabs[0]:
@@ -562,6 +564,14 @@ if st.session_state.app_mode == "master":
     # --- [TAB 5] 자동 수집기 (Phase 1 — URL 한 개로 옵션 자동 수집) ---
     with m_tabs[5]:
         render_auto_collector_tab()
+
+    # --- [TAB 6] 일괄 수집기 (Phase 2 — URL 여러 개 한 번에) ---
+    with m_tabs[6]:
+        render_bulk_collector_tab()
+
+    # --- [TAB 7] 키워드 수집기 (Phase 3 — 키워드 → 검색 → 자동 분석) ---
+    with m_tabs[7]:
+        render_keyword_collector_tab()
 
     st.stop()
 

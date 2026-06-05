@@ -205,8 +205,9 @@ def fetch_channel_uid(store_name: str, product_id: Optional[str] = None,
                         return m.group(1), None
                 return None, "HTML에서 channelUid를 찾지 못함 (페이지 구조 변경 가능성)"
             elif resp.status_code == 429:
-                # 봇 차단 — 지수 백오프로 대기 후 재시도
-                wait = (2 ** attempt) * 3 + random.uniform(0.5, 2.0)
+                # 봇 차단 — 더 긴 지수 백오프 (5/15/45초) + 랜덤 지터
+                # 네이버 IP 차단은 보통 30초~1분 후 풀리므로 마지막 시도는 45초+
+                wait = (3 ** attempt) * 5 + random.uniform(1.0, 4.0)
                 last_err = f"HTTP 429 (봇 차단), {wait:.1f}초 대기 후 재시도 ({attempt+1}/{max_retries})"
                 time.sleep(wait)
                 continue
@@ -289,7 +290,8 @@ def fetch_product_options(channel_uid: str, product_id: str,
 # 통합 함수: URL 하나로 완성
 # --------------------------------------------------------------------------
 def auto_collect(url: str, sleep_sec: float = 0.5,
-                 user_cookie: Optional[str] = None) -> Dict[str, Any]:
+                 user_cookie: Optional[str] = None,
+                 session: Optional[requests.Session] = None) -> Dict[str, Any]:
     """
     스마트스토어 URL 하나로 옵션 JSON까지 자동 수집.
 
@@ -320,8 +322,9 @@ def auto_collect(url: str, sleep_sec: float = 0.5,
         "steps": [],
     }
 
-    # 단일 세션 사용 (쿠키 자동 처리)
-    session = requests.Session()
+    # 세션 — 외부에서 주입되면 재사용 (봇 차단 회피에 핵심), 아니면 새로 생성
+    if session is None:
+        session = requests.Session()
 
     # 쿠키 적용 상태 표시
     eff_cookie = _get_naver_cookie(user_cookie)
